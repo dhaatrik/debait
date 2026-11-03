@@ -89,4 +89,4 @@ debait/
 ---
 
 ## 📄 License
-[MIT License](LICENSE) © 2026 dhaatrik. Free and open source.
+[MIT License](LICENSE) © 2026 Dhaatrik Chowdhury. Free and open source.
