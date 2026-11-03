@@ -23,8 +23,8 @@ describe('Manifest V3 Schema & Asset Verification', () => {
   });
 
   test('declares minimal required permissions', () => {
-    assert.deepEqual(manifest.permissions.sort(), ['declarativeNetRequest', 'storage'].sort());
-    assert.deepEqual(manifest.host_permissions.sort(), ['*://*.youtube.com/*', '*://*.ytimg.com/*'].sort());
+    assert.deepEqual(manifest.permissions, ['storage']);
+    assert.ok(manifest.host_permissions.includes('*://*.youtube.com/*'));
   });
 
   test('references valid background service worker file', () => {

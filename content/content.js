@@ -1,25 +1,21 @@
 /**
  * DeBait for YouTube™
- * Content Script - Dual-layer thumbnail replacement & Stageshow-crafted controls
+ * Content Script - Robust thumbnail replacer & Stageshow-crafted controls
  */
 
 // Pure helper functions (exported for automated unit testing)
 function extractVideoIdFromUrl(url) {
   if (!url || typeof url !== 'string') return null;
 
-  // Standard watch URL: watch?v=...
   const vParam = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
   if (vParam) return vParam[1];
 
-  // YouTube Shorts: /shorts/...
   const shortsParam = url.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
   if (shortsParam) return shortsParam[1];
 
-  // YouTube Embed: /embed/...
   const embedParam = url.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
   if (embedParam) return embedParam[1];
 
-  // CDN image endpoints: /vi/<ID>/ or /vi_webp/<ID>/
   const cdnMatch = url.match(/\/(?:vi|vi_webp)\/([a-zA-Z0-9_-]{11})\//);
   if (cdnMatch) return cdnMatch[1];
 
@@ -47,10 +43,7 @@ function getFallbackUrl(currentUrl, videoId) {
 (() => {
   if (typeof window === 'undefined' || typeof chrome === 'undefined' || !chrome.storage) return;
 
-  if (window.__debaitInitialized) return;
-  window.__debaitInitialized = true;
-
-  let settings = {
+  const DEFAULTS = {
     enabled: true,
     quality: 'high',
     showBadge: true,
@@ -58,285 +51,201 @@ function getFallbackUrl(currentUrl, videoId) {
     showIndividualToggle: true
   };
 
-  let isScheduled = false;
+  const ORIGIN = 'https://i.ytimg.com';
+  const THUMB_RE = /^(?:https?:)?\/\/i\d*\.ytimg\.com\/vi(?:_webp)?\/([\w-]{11})\/(\w+)\.(?:jpg|webp)/;
+  const AUTO_FRAME_RE = /^(?:hq|mq|sd|maxres|oar|hq720_)?[123]$/;
+  const CSS_URL_RE = /url\(\s*["']?([^"')]+)["']?\s*\)/;
+  const PLACEHOLDER_WIDTH = 120; // YouTube serves 120x90 grey placeholder for missing frames
 
-  // Load initial settings
-  chrome.storage.sync.get(
-    ['enabled', 'quality', 'showBadge', 'showNavbarToggle', 'showIndividualToggle'],
-    (items) => {
-      if (items.enabled !== undefined) settings.enabled = items.enabled;
-      if (items.quality !== undefined) settings.quality = items.quality;
-      if (items.showBadge !== undefined) settings.showBadge = items.showBadge;
-      if (items.showNavbarToggle !== undefined) settings.showNavbarToggle = items.showNavbarToggle;
-      if (items.showIndividualToggle !== undefined) settings.showIndividualToggle = items.showIndividualToggle;
+  let settings = { ...DEFAULTS };
+  const probeCache = new Map();
 
-      init();
-    }
-  );
-
-  // Sync settings dynamically
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== 'sync') return;
-
-    let needsUpdate = false;
-    for (const [key, change] of Object.entries(changes)) {
-      if (settings[key] !== change.newValue) {
-        settings[key] = change.newValue;
-        needsUpdate = true;
-      }
-    }
-
-    if (needsUpdate) {
-      updateNavbarToggleState();
-      applySettingsToAll();
-    }
-  });
-
-  function init() {
-    startObserver();
-    scheduleScan();
-
-    // YouTube SPA navigation events
-    window.addEventListener('yt-navigate-finish', () => {
-      scheduleScan();
-      injectNavbarToggle();
-    });
-
-    window.addEventListener('yt-page-data-updated', () => {
-      scheduleScan();
-    });
-
-    // Intercept image load events in capture phase to catch lazy-loaded thumbnails immediately
-    window.addEventListener('load', (e) => {
-      if (e.target && e.target.tagName === 'IMG') {
-        const img = e.target;
-        if (isYouTubeThumbnail(img)) {
-          processImage(img);
-        }
-      }
-    }, true);
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        scheduleScan();
-        injectNavbarToggle();
-      });
-    } else {
-      injectNavbarToggle();
-    }
-  }
-
-  function startObserver() {
-    const observer = new MutationObserver((mutations) => {
-      let needsScan = false;
-
-      for (const m of mutations) {
-        // Skip mutations caused by DeBait's own controls
-        if (
-          m.target &&
-          m.target.classList &&
-          (m.target.classList.contains('debait-thumbnail-badge') ||
-           m.target.classList.contains('debait-flip-btn') ||
-           m.target.classList.contains('debait-navbar-toggle'))
-        ) {
-          continue;
-        }
-
-        if (m.type === 'childList' && m.addedNodes.length > 0) {
-          needsScan = true;
-          break;
-        }
-
-        // CRITICAL FIX: Detect lazy-loaded image src/srcset and anchor href mutations
-        if (m.type === 'attributes') {
-          if (m.target && m.target.tagName === 'IMG') {
-            const img = m.target;
-            if (isYouTubeThumbnail(img)) {
-              processImage(img);
-            }
-          } else if (m.target && m.target.tagName === 'A' && m.attributeName === 'href') {
-            needsScan = true;
-            break;
-          }
-        }
-      }
-
-      if (needsScan) {
-        scheduleScan();
-      }
-    });
-
-    const targetNode = document.body || document.documentElement;
-    if (targetNode) {
-      observer.observe(targetNode, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['src', 'srcset', 'href']
-      });
-    }
-  }
-
-  function scheduleScan() {
-    if (isScheduled) return;
-    isScheduled = true;
-
-    requestAnimationFrame(() => {
-      scanAndProcessAll();
-      injectNavbarToggle();
-      isScheduled = false;
+  function probe(url) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img.naturalWidth > PLACEHOLDER_WIDTH);
+      img.onerror = () => resolve(false);
+      img.src = url;
     });
   }
 
-  function isYouTubeThumbnail(img) {
-    if (!img) return false;
-    const src = img.currentSrc || img.src || img.getAttribute('src') || '';
-    if (src.includes('ytimg.com/vi/') || src.includes('ytimg.com/vi_webp/')) return true;
+  function resolveMidpointFrame(id, quality) {
+    const key = `${id}:${quality}`;
+    let promise = probeCache.get(key);
+    if (!promise) {
+      promise = (async () => {
+        const candidates = quality === 'high'
+          ? [`${ORIGIN}/vi/${id}/hq720_2.jpg`, `${ORIGIN}/vi/${id}/hq2.jpg`]
+          : [`${ORIGIN}/vi/${id}/hq2.jpg`];
 
-    const closestThumbnail = img.closest('ytd-thumbnail, #thumbnail, a[href*="watch?v="], a[href*="/shorts/"]');
-    return !!closestThumbnail;
+        for (const url of candidates) {
+          if (await probe(url)) return url;
+        }
+        return `${ORIGIN}/vi/${id}/hq2.jpg`; // Ultimate fallback
+      })();
+      probeCache.set(key, promise);
+    }
+    return promise;
   }
 
-  function resolveVideoId(container, img) {
-    // 1. Check parent container anchors
-    const anchor = container ? (
-      container.closest('a') ||
-      container.querySelector('a#thumbnail, a#video-title-link, a.yt-simple-endpoint[href*="watch?v="], a[href*="/shorts/"]') ||
-      container.closest('ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer')?.querySelector('a#thumbnail, a#video-title-link')
-    ) : null;
+  function parseThumbUrl(url) {
+    const m = url && THUMB_RE.exec(url);
+    if (!m || AUTO_FRAME_RE.test(m[2])) return null;
+    return m[1];
+  }
 
+  // ---- <img> Element Processing ---------------------------------------------
+
+  function processImg(img) {
+    const src = img.getAttribute('src') || '';
+    if (img.dataset.debait && src === img.dataset.debait) return; // Already processed
+
+    const id = parseThumbUrl(src) || resolveIdFromContext(img);
+    if (!id) return;
+
+    if (!img.dataset.debaitOrig) {
+      img.dataset.debaitOrig = src;
+    }
+
+    const container = img.closest('ytd-thumbnail, #thumbnail, .ytp-videowall-still') || img.parentElement;
+    if (container) {
+      container.dataset.debaitVideoId = id;
+      setupIndividualFlipButton(container, img, id);
+    }
+
+    // Check individual override
+    const override = container?.dataset?.debaitManualOverride;
+    const shouldShow = override !== undefined ? override === 'true' : settings.enabled;
+
+    if (!shouldShow) {
+      restoreImg(img, container);
+      return;
+    }
+
+    resolveMidpointFrame(id, settings.quality).then((url) => {
+      if (!url || img.getAttribute('src') !== src) return;
+
+      img.dataset.debait = url;
+
+      if (img.hasAttribute('srcset') && !img.dataset.debaitSrcset) {
+        img.dataset.debaitSrcset = img.getAttribute('srcset');
+        img.removeAttribute('srcset');
+      }
+
+      img.src = url;
+      img.style.objectFit = 'cover';
+
+      if (container) {
+        container.dataset.debaitState = 'halfway';
+        updateBadge(container, true);
+        updateFlipButtonTooltip(container, 'halfway');
+      }
+    });
+  }
+
+  function restoreImg(img, container) {
+    if (img.dataset.debaitOrig) {
+      img.src = img.dataset.debaitOrig;
+      delete img.dataset.debait;
+    }
+    if (img.dataset.debaitSrcset) {
+      img.setAttribute('srcset', img.dataset.debaitSrcset);
+      delete img.dataset.debaitSrcset;
+    }
+    if (container) {
+      container.dataset.debaitState = 'original';
+      updateBadge(container, false);
+      updateFlipButtonTooltip(container, 'original');
+    }
+  }
+
+  // ---- Background Image Processing (e.g. Endscreens) -------------------------
+
+  function processBg(el) {
+    const style = el.getAttribute('style');
+    if (!style || !style.includes('ytimg.com')) return;
+    const bg = el.style.backgroundImage;
+    const m = bg && CSS_URL_RE.exec(bg);
+    if (!m) return;
+    const current = m[1];
+    if (el.dataset.debaitBg && current === el.dataset.debaitBg) return;
+
+    const id = parseThumbUrl(current);
+    if (!id) return;
+
+    el.dataset.debaitBgOrig = bg;
+    if (!settings.enabled) return;
+
+    resolveMidpointFrame(id, settings.quality).then((url) => {
+      if (!url || !settings.enabled || el.style.backgroundImage !== bg) return;
+      el.dataset.debaitBg = url;
+      el.style.backgroundImage = `url("${url}")`;
+    });
+  }
+
+  function resolveIdFromContext(img) {
+    const anchor = img.closest('a') ||
+      img.closest('ytd-thumbnail, ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer')?.querySelector('a#thumbnail, a#video-title-link, a[href*="watch?v="]');
     if (anchor && anchor.href) {
-      const id = extractVideoIdFromUrl(anchor.href);
-      if (id) return id;
+      return extractVideoIdFromUrl(anchor.href);
     }
-
-    // 2. Check image attributes directly
-    const src = (img && (img.currentSrc || img.src || img.getAttribute('src'))) || '';
-    if (src) {
-      const id = extractVideoIdFromUrl(src);
-      if (id) return id;
-    }
-
-    const srcset = img && img.getAttribute('srcset');
-    if (srcset) {
-      const id = extractVideoIdFromUrl(srcset);
-      if (id) return id;
-    }
-
     return null;
   }
 
-  function scanAndProcessAll() {
-    // 1. Query thumbnail containers
-    const containers = document.querySelectorAll(
-      'ytd-thumbnail, #thumbnail, ytd-rich-grid-media ytd-thumbnail, ytd-compact-video-renderer ytd-thumbnail, .ytp-videowall-still'
-    );
+  // ---- DOM Scanning & MutationObserver --------------------------------------
 
-    containers.forEach((container) => {
-      const img = container.querySelector('img#img, img.yt-core-image, img');
-      if (img) {
-        processThumbnail(container, img);
+  function scan(root) {
+    if (!root || (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_NODE)) return;
+
+    if (root.tagName === 'IMG') processImg(root);
+    else if (root.getAttribute && root.getAttribute('style')) processBg(root);
+
+    const imgs = root.querySelectorAll ? root.querySelectorAll('img[src*="ytimg.com/vi"]') : [];
+    for (const img of imgs) processImg(img);
+
+    const bgs = root.querySelectorAll ? root.querySelectorAll('[style*="ytimg.com/vi"]') : [];
+    for (const el of bgs) processBg(el);
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (
+        m.target &&
+        m.target.classList &&
+        (m.target.classList.contains('debait-thumbnail-badge') ||
+         m.target.classList.contains('debait-flip-btn') ||
+         m.target.classList.contains('debait-navbar-toggle'))
+      ) {
+        continue;
       }
-    });
 
-    // 2. Direct scan of all YouTube thumbnail images on page (ensures coverage even on customized feeds)
-    const images = document.querySelectorAll('img[src*="ytimg.com/vi"], img[src*="ytimg.com/vi_webp"]');
-    images.forEach((img) => {
+      if (m.type === 'attributes') {
+        if (m.attributeName === 'src') {
+          if (m.target.tagName === 'IMG') processImg(m.target);
+        } else if (m.attributeName === 'style') {
+          processBg(m.target);
+        }
+      } else {
+        for (const node of m.addedNodes) scan(node);
+      }
+    }
+  });
+
+  function revertAll() {
+    for (const img of document.querySelectorAll('img[data-debait-orig]')) {
       const container = img.closest('ytd-thumbnail, #thumbnail, .ytp-videowall-still') || img.parentElement;
-      if (container) {
-        processThumbnail(container, img);
-      }
-    });
-  }
-
-  function processImage(img) {
-    const container = img.closest('ytd-thumbnail, #thumbnail, .ytp-videowall-still') || img.parentElement;
-    if (container) {
-      processThumbnail(container, img);
+      restoreImg(img, container);
     }
-  }
-
-  function processThumbnail(container, img) {
-    const videoId = container.dataset.debaitVideoId || resolveVideoId(container, img);
-    if (!videoId) return;
-
-    container.dataset.debaitVideoId = videoId;
-
-    // Cache original creator image attributes safely
-    if (!img.dataset.debaitOrigSrc) {
-      const initialSrc = img.currentSrc || img.src || img.getAttribute('src');
-      if (initialSrc && !initialSrc.includes('_2.jpg') && !initialSrc.includes('/2.jpg')) {
-        img.dataset.debaitOrigSrc = initialSrc;
+    for (const el of document.querySelectorAll('[data-debait-bg-orig]')) {
+      if (el.dataset.debaitBgOrig) {
+        el.style.backgroundImage = el.dataset.debaitBgOrig;
+        delete el.dataset.debaitBg;
+        delete el.dataset.debaitBgOrig;
       }
     }
-
-    if (img.getAttribute('srcset') && !img.dataset.debaitOrigSrcset) {
-      img.dataset.debaitOrigSrcset = img.getAttribute('srcset');
-    }
-
-    const halfwayUrl = getHalfwayUrl(videoId, settings.quality);
-    img.dataset.debaitHalfwaySrc = halfwayUrl;
-
-    // Setup per-video flip button
-    setupIndividualFlipButton(container, img, videoId);
-
-    // Check manual override
-    const override = container.dataset.debaitManualOverride;
-    const shouldShowHalfway = override !== undefined
-      ? override === 'true'
-      : settings.enabled;
-
-    if (shouldShowHalfway) {
-      showHalfwayThumbnail(container, img, videoId, halfwayUrl);
-    } else {
-      showOriginalThumbnail(container, img);
-    }
   }
 
-  function showHalfwayThumbnail(container, img, videoId, halfwayUrl) {
-    if (img.dataset.debaitState === 'halfway' && (img.src.includes('_2.jpg') || img.src.includes('/2.jpg'))) {
-      updateBadge(container, true);
-      return;
-    }
-
-    img.onerror = () => {
-      const fallback = getFallbackUrl(img.src, videoId);
-      if (fallback && img.src !== fallback) {
-        img.src = fallback;
-      }
-    };
-
-    if (img.getAttribute('srcset')) {
-      img.removeAttribute('srcset');
-    }
-
-    img.src = halfwayUrl;
-    img.dataset.debaitState = 'halfway';
-    container.dataset.debaitState = 'halfway';
-
-    updateBadge(container, true);
-    updateFlipButtonTooltip(container, 'halfway');
-  }
-
-  function showOriginalThumbnail(container, img) {
-    if (img.dataset.debaitState === 'original' && !img.src.includes('_2.jpg') && !img.src.includes('/2.jpg')) {
-      updateBadge(container, false);
-      return;
-    }
-
-    if (img.dataset.debaitOrigSrc) {
-      img.src = img.dataset.debaitOrigSrc;
-      if (img.dataset.debaitOrigSrcset) {
-        img.setAttribute('srcset', img.dataset.debaitOrigSrcset);
-      }
-    }
-
-    img.dataset.debaitState = 'original';
-    container.dataset.debaitState = 'original';
-
-    updateBadge(container, false);
-    updateFlipButtonTooltip(container, 'original');
-  }
+  // ---- Stageshow UI: 50% Midpoint Badge ------------------------------------
 
   function updateBadge(container, isHalfway) {
     let badge = container.querySelector('.debait-thumbnail-badge');
@@ -356,6 +265,8 @@ function getFallbackUrl(currentUrl, videoId) {
       badge.style.display = 'none';
     }
   }
+
+  // ---- Stageshow UI: Hover Flip Button -------------------------------------
 
   function setupIndividualFlipButton(container, img, videoId) {
     if (!settings.showIndividualToggle) {
@@ -384,12 +295,10 @@ function getFallbackUrl(currentUrl, videoId) {
 
         container.dataset.debaitManualOverride = willBeHalfway ? 'true' : 'false';
 
-        const halfwayUrl = getHalfwayUrl(videoId, settings.quality);
-
         if (willBeHalfway) {
-          showHalfwayThumbnail(container, img, videoId, halfwayUrl);
+          processImg(img);
         } else {
-          showOriginalThumbnail(container, img);
+          restoreImg(img, container);
         }
       });
 
@@ -397,19 +306,17 @@ function getFallbackUrl(currentUrl, videoId) {
     }
 
     btn.style.display = 'flex';
-    updateFlipButtonTooltip(container, container.dataset.debaitState || 'halfway');
   }
 
-  function updateFlipButtonTooltip(container, currentState) {
+  function updateFlipButtonTooltip(container, state) {
     const btn = container.querySelector('.debait-flip-btn');
     if (!btn) return;
-
-    if (currentState === 'halfway') {
-      btn.title = 'Showing 50% midpoint frame. Click to view creator thumbnail.';
-    } else {
-      btn.title = 'Showing creator thumbnail. Click to view 50% midpoint frame.';
-    }
+    btn.title = state === 'halfway'
+      ? 'DeBait: Showing 50% midpoint frame. Click to view creator thumbnail.'
+      : 'DeBait: Showing creator thumbnail. Click to view 50% midpoint frame.';
   }
+
+  // ---- Stageshow UI: Masthead Pill -----------------------------------------
 
   function injectNavbarToggle() {
     if (!settings.showNavbarToggle) {
@@ -460,7 +367,11 @@ function getFallbackUrl(currentUrl, videoId) {
 
       chrome.storage.sync.set({ enabled: newEnabled }, () => {
         updateNavbarToggleState();
-        applySettingsToAll();
+        if (newEnabled) {
+          scan(document);
+        } else {
+          revertAll();
+        }
       });
     });
 
@@ -481,9 +392,53 @@ function getFallbackUrl(currentUrl, videoId) {
     }
   }
 
-  function applySettingsToAll() {
-    scanAndProcessAll();
+  // ---- Bootstrap -----------------------------------------------------------
+
+  function start() {
+    observer.observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['src', 'style'],
+    });
+
+    if (settings.enabled) scan(document);
+    injectNavbarToggle();
+
+    window.addEventListener('yt-navigate-finish', () => {
+      if (settings.enabled) scan(document);
+      injectNavbarToggle();
+    });
+
+    window.addEventListener('yt-page-data-updated', () => {
+      if (settings.enabled) scan(document);
+    });
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        if (settings.enabled) scan(document);
+        injectNavbarToggle();
+      });
+    }
   }
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'sync') return;
+    for (const [key, { newValue }] of Object.entries(changes)) {
+      if (key in settings) settings[key] = newValue;
+    }
+    updateNavbarToggleState();
+    if (!settings.enabled) {
+      revertAll();
+    } else {
+      scan(document);
+    }
+  });
+
+  chrome.storage.sync.get(DEFAULTS, (stored) => {
+    settings = { ...DEFAULTS, ...stored };
+    start();
+  });
 })();
 
 // Export for automated unit test runner
