@@ -1,8 +1,9 @@
-/* DeBait for YouTube - Content Styles */
-
 /* ==========================================================================
-   1. Masthead Navbar Toggle
+   DeBait for YouTube - Stageshow Injected UI Styles
+   Aesthetic: Stageshow dark-hero with precision surface depth & emerald accent
    ========================================================================== */
+
+/* 1. YouTube Masthead In-Page Toggle Pill */
 #debait-navbar-toggle-container {
   display: inline-flex;
   align-items: center;
@@ -11,26 +12,21 @@
 }
 
 .debait-navbar-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--yt-spec-badge-chip-background, rgba(255, 255, 255, 0.1));
-  color: var(--yt-spec-text-primary, #ffffff);
-  border: 1px solid var(--yt-spec-10-percent-layer, rgba(255, 255, 255, 0.15));
-  border-radius: 18px;
+  background: var(--yt-spec-badge-chip-background, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--yt-spec-10-percent-layer, rgba(255, 255, 255, 0.12));
+  border-radius: 20px;
   padding: 4px 10px;
-  font-family: "Roboto", "Segoe UI", Arial, sans-serif;
-  font-size: 13px;
-  font-weight: 500;
   cursor: pointer;
   user-select: none;
-  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
+  outline: none;
+  font-family: inherit;
 }
 
 .debait-navbar-toggle:hover {
-  background: var(--yt-spec-button-chip-background-hover, rgba(255, 255, 255, 0.2));
-  border-color: var(--yt-spec-text-secondary, rgba(255, 255, 255, 0.3));
+  background: var(--yt-spec-button-chip-background-hover, rgba(255, 255, 255, 0.15));
+  border-color: rgba(255, 255, 255, 0.25);
   transform: translateY(-1px);
 }
 
@@ -38,127 +34,143 @@
   transform: translateY(0);
 }
 
-.debait-navbar-toggle .debait-toggle-icon {
+.debait-nav-pill-content {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #00c853;
-  transition: color 0.2s ease;
+  gap: 8px;
 }
 
-.debait-navbar-toggle.is-disabled .debait-toggle-icon {
-  color: var(--yt-spec-text-secondary, #aaaaaa);
+/* Pulsing Status Light */
+.debait-status-light {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #64748b;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.debait-navbar-toggle .debait-toggle-label {
-  line-height: 1;
-  letter-spacing: 0.2px;
+.debait-navbar-toggle.is-active .debait-status-light {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.debait-nav-label {
+  font-size: 13px;
   font-weight: 600;
+  letter-spacing: -0.1px;
+  color: var(--yt-spec-text-primary, #ffffff);
+  line-height: 1;
 }
 
-.debait-navbar-toggle .debait-toggle-pill {
-  width: 32px;
-  height: 18px;
-  background: #444;
-  border-radius: 10px;
+/* Tactile Micro-Switch */
+.debait-nav-switch {
+  width: 28px;
+  height: 16px;
+  background: #334155;
+  border-radius: 12px;
   position: relative;
-  transition: background 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-.debait-navbar-toggle.is-active .debait-toggle-pill {
-  background: #00c853;
+.debait-navbar-toggle.is-active .debait-nav-switch {
+  background: #10b981;
 }
 
-.debait-navbar-toggle .debait-toggle-pill::after {
-  content: "";
+.debait-nav-switch-thumb {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   background: #ffffff;
   border-radius: 50%;
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-.debait-navbar-toggle.is-active .debait-toggle-pill::after {
-  transform: translateX(14px);
+.debait-navbar-toggle.is-active .debait-nav-switch-thumb {
+  transform: translateX(12px);
 }
 
 /* ==========================================================================
-   2. Thumbnail Badges & Overlay Elements
+   2. Thumbnail Badges & Micro-Interactions
    ========================================================================== */
 ytd-thumbnail,
 #thumbnail.ytd-thumbnail,
 .ytp-videowall-still,
 ytd-compact-video-renderer ytd-thumbnail,
 ytd-rich-grid-media ytd-thumbnail {
-  position: relative;
+  position: relative !important;
 }
 
-/* Ensure images scale crisply with aspect fill */
-ytd-thumbnail img[data-debait-state="halfway"] {
+/* Ensure clean scaling for 16:9 frames */
+ytd-thumbnail img[data-debait-state="halfway"],
+#thumbnail img[data-debait-state="halfway"] {
   object-fit: cover !important;
 }
 
-/* Halfway Frame Corner Badge */
+/* Stageshow Frosted Glass 50% Midpoint Badge */
 .debait-thumbnail-badge {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: 8px;
+  left: 8px;
   z-index: 10;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  background: rgba(0, 0, 0, 0.78);
-  color: #00e676;
-  font-family: "Roboto", "Segoe UI", Arial, sans-serif;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  border-radius: 4px;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  gap: 5px;
+  padding: 3px 7px;
+  background: rgba(10, 12, 16, 0.82);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 5px;
+  color: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   pointer-events: none;
-  border: 1px solid rgba(0, 230, 118, 0.35);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-  animation: debaitFadeIn 0.2s ease-out;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  animation: debaitBadgeEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.debait-thumbnail-badge svg {
-  width: 11px;
-  height: 11px;
-  fill: currentColor;
+.debait-badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
 }
 
-/* Per-video thumbnail hover flip button */
+/* Stageshow Floating Flip Button */
 .debait-flip-btn {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 8px;
+  right: 8px;
   z-index: 12;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  background: rgba(15, 15, 15, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #ffffff;
+  background: rgba(15, 18, 22, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   opacity: 0;
-  transform: scale(0.9);
-  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  transform: scale(0.85);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   padding: 0;
+  outline: none;
 }
 
-/* Show button when parent thumbnail is hovered */
+/* Reveal when parent container is hovered */
 ytd-thumbnail:hover .debait-flip-btn,
 #thumbnail:hover .debait-flip-btn,
 ytd-compact-video-renderer:hover .debait-flip-btn,
@@ -169,27 +181,21 @@ ytd-rich-grid-media:hover .debait-flip-btn,
 }
 
 .debait-flip-btn:hover {
-  background: #00c853;
-  color: #000000;
-  border-color: #00c853;
-  transform: scale(1.12);
+  background: #10b981;
+  color: #022c22;
+  border-color: #10b981;
+  transform: scale(1.1);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
 }
 
 .debait-flip-btn:active {
   transform: scale(0.95);
 }
 
-.debait-flip-btn svg {
-  width: 15px;
-  height: 15px;
-  fill: currentColor;
-}
-
-/* Flip animation helper */
-@keyframes debaitFadeIn {
+@keyframes debaitBadgeEnter {
   from {
     opacity: 0;
-    transform: translateY(-2px);
+    transform: translateY(-3px);
   }
   to {
     opacity: 1;

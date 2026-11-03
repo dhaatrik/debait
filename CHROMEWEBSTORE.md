@@ -60,7 +60,9 @@ English
 | Permission | Type | Justification |
 |---|---|---|
 | `storage` | permissions | Saves user preferences (such as enabling/disabling halfway thumbnails, badge visibility, and preferred image resolution) and synchronizes them across browser sessions. |
-| `*://*.youtube.com/*` | host_permissions | Required to detect video elements on YouTube pages and swap thumbnail image elements with their corresponding midpoint frame. |
+| `declarativeNetRequest` | permissions | Performs zero-flicker network-level redirection of video thumbnail image requests to corresponding midpoint keyframes without slowing down page rendering. |
+| `*://*.youtube.com/*` | host_permissions | Required to detect video elements on YouTube pages and inject the masthead toggle and flip controls. |
+| `*://*.ytimg.com/*` | host_permissions | Required to intercept and redirect YouTube's image CDN thumbnail requests to authentic halfway video stills. |
 
 ---
 
@@ -79,4 +81,5 @@ DeBait does not collect, transmit, store, or sell any personal or browsing infor
 
 ## Version History
 
+- **v1.0.1** (2026-11-03): Stageshow dark-hero UI revamp. Added network-level interception via `declarativeNetRequest` for zero-flicker instant replacement, capture-phase lazy-load interception, and `*://*.ytimg.com/*` host permissions.
 - **v1.0.0** (2026-11-03): Initial release. Full halfway frame replacement (HD 720p with fallback), top navigation bar toggle switch, individual hover flip button, corner 50% badges, keyboard shortcut (`Alt+H`), and settings popup.

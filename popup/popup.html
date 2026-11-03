@@ -7,96 +7,115 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="popup-container">
-    <!-- Header -->
+  <div class="stageshow-frame">
+    <!-- Header Surface -->
     <header class="header">
-      <div class="logo-group">
-        <img src="../icons/icon-48.png" alt="DeBait Logo" class="logo-icon">
-        <div class="title-wrapper">
-          <h1 class="title">DeBait</h1>
-          <span class="version">v1.0.0</span>
+      <div class="brand">
+        <img src="../icons/icon-48.png" alt="DeBait Logo" class="brand-icon">
+        <div class="brand-text">
+          <h1 class="brand-title">DeBait</h1>
+          <span class="brand-version">v1.0.1</span>
         </div>
       </div>
-      <div class="status-indicator active" id="status-badge">
-        <span class="dot"></span>
-        <span class="status-text" id="status-label">Active</span>
+      <div class="status-pill active" id="status-badge">
+        <span class="status-glow"></span>
+        <span class="status-label" id="status-label">Active</span>
       </div>
     </header>
 
-    <!-- Master Switch Hero Card -->
-    <div class="hero-card">
-      <div class="hero-info">
-        <h2 class="hero-title">Halfway Frames</h2>
-        <p class="hero-desc">Display genuine stills from 50% into the video</p>
+    <!-- Master Control Hero Card -->
+    <div class="hero-surface" id="hero-card">
+      <div class="hero-content">
+        <div class="hero-title-group">
+          <span class="hero-eyebrow">Anti-Clickbait Engine</span>
+          <h2 class="hero-heading">Midpoint Frames</h2>
+        </div>
+        <p class="hero-caption">Swap thumbnails with 50% video keyframes</p>
       </div>
-      <label class="switch-container">
+      <label class="switch-control master-switch">
         <input type="checkbox" id="master-toggle" checked>
-        <span class="slider"></span>
+        <span class="switch-track">
+          <span class="switch-thumb"></span>
+        </span>
       </label>
     </div>
 
-    <!-- Quick Action / Shortcut Hint -->
-    <div class="shortcut-tip">
-      <span class="shortcut-icon">⚡</span>
-      <span class="shortcut-text">Press <kbd>Alt</kbd> + <kbd>H</kbd> on YouTube to toggle instantly</span>
+    <!-- Quick Hotkey Indicator -->
+    <div class="hotkey-banner">
+      <div class="hotkey-keys">
+        <kbd class="keycap">Alt</kbd>
+        <span class="hotkey-plus">+</span>
+        <kbd class="keycap">H</kbd>
+      </div>
+      <span class="hotkey-desc">Toggle anytime on YouTube</span>
     </div>
 
-    <!-- Settings Group -->
-    <div class="settings-group">
-      <h3 class="section-label">Options</h3>
+    <!-- Configuration Options Surface -->
+    <section class="options-surface">
+      <div class="surface-header">
+        <span class="surface-label">Configuration</span>
+      </div>
 
-      <!-- Top Bar Toggle -->
-      <div class="setting-item">
-        <div class="setting-info">
-          <span class="setting-name">Top Bar Toggle</span>
-          <span class="setting-desc">Add a 1-click toggle button to YouTube's header</span>
+      <!-- Top Bar Switch -->
+      <div class="option-row">
+        <div class="option-meta">
+          <span class="option-title">YouTube Top Bar Switch</span>
+          <span class="option-desc">Native 1-click toggle in YouTube masthead</span>
         </div>
-        <label class="switch-container small">
+        <label class="switch-control">
           <input type="checkbox" id="setting-navbar" checked>
-          <span class="slider"></span>
+          <span class="switch-track">
+            <span class="switch-thumb"></span>
+          </span>
         </label>
       </div>
 
       <!-- Hover Flip Button -->
-      <div class="setting-item">
-        <div class="setting-info">
-          <span class="setting-name">Hover Flip Button</span>
-          <span class="setting-desc">Flip single thumbnails with a button on hover</span>
+      <div class="option-row">
+        <div class="option-meta">
+          <span class="option-title">Hover Flip Button</span>
+          <span class="option-desc">Inspect creator thumbnail per-video</span>
         </div>
-        <label class="switch-container small">
+        <label class="switch-control">
           <input type="checkbox" id="setting-flip-btn" checked>
-          <span class="slider"></span>
+          <span class="switch-track">
+            <span class="switch-thumb"></span>
+          </span>
         </label>
       </div>
 
-      <!-- Corner Badge -->
-      <div class="setting-item">
-        <div class="setting-info">
-          <span class="setting-name">"50%" Frame Badge</span>
-          <span class="setting-desc">Show indicator tag on replaced thumbnails</span>
+      <!-- 50% Midpoint Badge -->
+      <div class="option-row">
+        <div class="option-meta">
+          <span class="option-title">50% Midpoint Badge</span>
+          <span class="option-desc">Display corner verification tag</span>
         </div>
-        <label class="switch-container small">
+        <label class="switch-control">
           <input type="checkbox" id="setting-badge" checked>
-          <span class="slider"></span>
+          <span class="switch-track">
+            <span class="switch-thumb"></span>
+          </span>
         </label>
       </div>
 
-      <!-- HD Quality -->
-      <div class="setting-item">
-        <div class="setting-info">
-          <span class="setting-name">Prefer HD Quality (720p)</span>
-          <span class="setting-desc">Use crisp 1280×720 frames whenever available</span>
+      <!-- Prefer 720p HD -->
+      <div class="option-row">
+        <div class="option-meta">
+          <span class="option-title">Prefer 720p HD Resolution</span>
+          <span class="option-desc">Load crisp 1280×720 frames when available</span>
         </div>
-        <label class="switch-container small">
+        <label class="switch-control">
           <input type="checkbox" id="setting-quality" checked>
-          <span class="slider"></span>
+          <span class="switch-track">
+            <span class="switch-thumb"></span>
+          </span>
         </label>
       </div>
-    </div>
+    </section>
 
-    <!-- Footer Note -->
+    <!-- Footer -->
     <footer class="footer">
-      <p>DeBait — Anti-clickbait YouTube thumbnails.</p>
+      <span class="footer-credit">DeBait • Honest YouTube Previews</span>
     </footer>
   </div>
 

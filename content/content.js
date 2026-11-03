@@ -1,6 +1,6 @@
 /**
  * DeBait for YouTube™
- * Content Script - Injects halfway video frames and interactive toggles
+ * Content Script - Dual-layer thumbnail replacement & Stageshow-crafted controls
  */
 
 // Pure helper functions (exported for automated unit testing)
@@ -45,27 +45,22 @@ function getFallbackUrl(currentUrl, videoId) {
 
 // Browser content script execution
 (() => {
-  // Only execute DOM logic in browser environment with chrome.storage available
   if (typeof window === 'undefined' || typeof chrome === 'undefined' || !chrome.storage) return;
 
-  // Guard against multiple injections
   if (window.__debaitInitialized) return;
   window.__debaitInitialized = true;
 
-  // Extension Settings (synced from storage)
   let settings = {
     enabled: true,
-    quality: 'high', // 'high' (hq720_2) or 'standard' (hq2)
+    quality: 'high',
     showBadge: true,
     showNavbarToggle: true,
     showIndividualToggle: true
   };
 
-  // Keep track of processed images and total session swaps
-  let swappedCount = 0;
-  let isProcessingScheduled = false;
+  let isScheduled = false;
 
-  // Initialize settings from Chrome storage
+  // Load initial settings
   chrome.storage.sync.get(
     ['enabled', 'quality', 'showBadge', 'showNavbarToggle', 'showIndividualToggle'],
     (items) => {
@@ -79,7 +74,7 @@ function getFallbackUrl(currentUrl, videoId) {
     }
   );
 
-  // Listen for storage updates (e.g. toggled from popup or keyboard shortcut)
+  // Sync settings dynamically
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'sync') return;
 
@@ -97,159 +92,216 @@ function getFallbackUrl(currentUrl, videoId) {
     }
   });
 
-  // Main initializer
   function init() {
-    scheduleProcessThumbnails();
-    injectNavbarToggle();
-
-    // Setup MutationObserver to handle YouTube dynamic scrolling and navigation
-    const observer = new MutationObserver((mutations) => {
-      let shouldProcess = false;
-
-      for (const mutation of mutations) {
-        // Skip mutations caused by our own UI elements
-        if (
-          mutation.target &&
-          mutation.target.classList &&
-          (mutation.target.classList.contains('debait-thumbnail-badge') ||
-           mutation.target.classList.contains('debait-flip-btn') ||
-           mutation.target.classList.contains('debait-navbar-toggle'))
-        ) {
-          continue;
-        }
-
-        if (mutation.addedNodes.length > 0) {
-          shouldProcess = true;
-          break;
-        }
-      }
-
-      if (shouldProcess) {
-        scheduleProcessThumbnails();
-        injectNavbarToggle();
-      }
-    });
-
-    observer.observe(document.body || document.documentElement, {
-      childList: true,
-      subtree: true
-    });
+    startObserver();
+    scheduleScan();
 
     // YouTube SPA navigation events
     window.addEventListener('yt-navigate-finish', () => {
-      scheduleProcessThumbnails();
+      scheduleScan();
       injectNavbarToggle();
     });
 
     window.addEventListener('yt-page-data-updated', () => {
-      scheduleProcessThumbnails();
+      scheduleScan();
     });
+
+    // Intercept image load events in capture phase to catch lazy-loaded thumbnails immediately
+    window.addEventListener('load', (e) => {
+      if (e.target && e.target.tagName === 'IMG') {
+        const img = e.target;
+        if (isYouTubeThumbnail(img)) {
+          processImage(img);
+        }
+      }
+    }, true);
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        scheduleScan();
+        injectNavbarToggle();
+      });
+    } else {
+      injectNavbarToggle();
+    }
   }
 
-  // Schedule a batched thumbnail update via requestAnimationFrame
-  function scheduleProcessThumbnails() {
-    if (isProcessingScheduled) return;
-    isProcessingScheduled = true;
+  function startObserver() {
+    const observer = new MutationObserver((mutations) => {
+      let needsScan = false;
+
+      for (const m of mutations) {
+        // Skip mutations caused by DeBait's own controls
+        if (
+          m.target &&
+          m.target.classList &&
+          (m.target.classList.contains('debait-thumbnail-badge') ||
+           m.target.classList.contains('debait-flip-btn') ||
+           m.target.classList.contains('debait-navbar-toggle'))
+        ) {
+          continue;
+        }
+
+        if (m.type === 'childList' && m.addedNodes.length > 0) {
+          needsScan = true;
+          break;
+        }
+
+        // CRITICAL FIX: Detect lazy-loaded image src/srcset and anchor href mutations
+        if (m.type === 'attributes') {
+          if (m.target && m.target.tagName === 'IMG') {
+            const img = m.target;
+            if (isYouTubeThumbnail(img)) {
+              processImage(img);
+            }
+          } else if (m.target && m.target.tagName === 'A' && m.attributeName === 'href') {
+            needsScan = true;
+            break;
+          }
+        }
+      }
+
+      if (needsScan) {
+        scheduleScan();
+      }
+    });
+
+    const targetNode = document.body || document.documentElement;
+    if (targetNode) {
+      observer.observe(targetNode, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['src', 'srcset', 'href']
+      });
+    }
+  }
+
+  function scheduleScan() {
+    if (isScheduled) return;
+    isScheduled = true;
 
     requestAnimationFrame(() => {
-      processThumbnails();
-      isProcessingScheduled = false;
+      scanAndProcessAll();
+      injectNavbarToggle();
+      isScheduled = false;
     });
   }
 
-  /**
-   * Extracts YouTube Video ID from element or its surroundings
-   */
-  function extractVideoId(container, img) {
-    // 1. Check parent anchors for watch?v= or /shorts/
-    const anchor = container.closest('a') ||
+  function isYouTubeThumbnail(img) {
+    if (!img) return false;
+    const src = img.currentSrc || img.src || img.getAttribute('src') || '';
+    if (src.includes('ytimg.com/vi/') || src.includes('ytimg.com/vi_webp/')) return true;
+
+    const closestThumbnail = img.closest('ytd-thumbnail, #thumbnail, a[href*="watch?v="], a[href*="/shorts/"]');
+    return !!closestThumbnail;
+  }
+
+  function resolveVideoId(container, img) {
+    // 1. Check parent container anchors
+    const anchor = container ? (
+      container.closest('a') ||
       container.querySelector('a#thumbnail, a#video-title-link, a.yt-simple-endpoint[href*="watch?v="], a[href*="/shorts/"]') ||
-      container.closest('ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer')?.querySelector('a#thumbnail, a#video-title-link');
+      container.closest('ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer')?.querySelector('a#thumbnail, a#video-title-link')
+    ) : null;
 
     if (anchor && anchor.href) {
       const id = extractVideoIdFromUrl(anchor.href);
       if (id) return id;
     }
 
-    // 2. Check image src or currentSrc directly
-    const srcToCheck = (img && (img.currentSrc || img.src || img.getAttribute('src'))) || '';
-    if (srcToCheck) {
-      const id = extractVideoIdFromUrl(srcToCheck);
+    // 2. Check image attributes directly
+    const src = (img && (img.currentSrc || img.src || img.getAttribute('src'))) || '';
+    if (src) {
+      const id = extractVideoIdFromUrl(src);
       if (id) return id;
     }
 
-    // 3. Check srcset if present
-    const srcSet = img && img.getAttribute('srcset');
-    if (srcSet) {
-      const id = extractVideoIdFromUrl(srcSet);
+    const srcset = img && img.getAttribute('srcset');
+    if (srcset) {
+      const id = extractVideoIdFromUrl(srcset);
       if (id) return id;
     }
 
     return null;
   }
 
-  /**
-   * Processes all thumbnail containers on the current page
-   */
-  function processThumbnails() {
+  function scanAndProcessAll() {
+    // 1. Query thumbnail containers
     const containers = document.querySelectorAll(
-      'ytd-thumbnail, #thumbnail.ytd-thumbnail, .ytp-videowall-still, ytd-playlist-video-renderer #thumbnail'
+      'ytd-thumbnail, #thumbnail, ytd-rich-grid-media ytd-thumbnail, ytd-compact-video-renderer ytd-thumbnail, .ytp-videowall-still'
     );
 
     containers.forEach((container) => {
       const img = container.querySelector('img#img, img.yt-core-image, img');
-      if (!img) return;
-
-      const videoId = extractVideoId(container, img);
-      if (!videoId) return;
-
-      container.dataset.debaitVideoId = videoId;
-
-      // Preserve original source once
-      if (!img.dataset.debaitOrigSrc) {
-        const initialSrc = img.currentSrc || img.src || img.getAttribute('src');
-        if (initialSrc && !initialSrc.includes('_2.jpg') && !initialSrc.includes('/2.jpg')) {
-          img.dataset.debaitOrigSrc = initialSrc;
-        }
+      if (img) {
+        processThumbnail(container, img);
       }
+    });
 
-      if (img.getAttribute('srcset') && !img.dataset.debaitOrigSrcset) {
-        img.dataset.debaitOrigSrcset = img.getAttribute('srcset');
-      }
-
-      const halfwayUrl = getHalfwayUrl(videoId, settings.quality);
-      img.dataset.debaitHalfwaySrc = halfwayUrl;
-
-      // Setup per-thumbnail flip button
-      setupIndividualFlipButton(container, img, videoId);
-
-      // Determine display mode (check manual override or global)
-      const override = container.dataset.debaitManualOverride;
-      const shouldShowHalfway = override !== undefined
-        ? override === 'true'
-        : settings.enabled;
-
-      if (shouldShowHalfway) {
-        showHalfwayThumbnail(container, img, videoId, halfwayUrl);
-      } else {
-        showOriginalThumbnail(container, img);
+    // 2. Direct scan of all YouTube thumbnail images on page (ensures coverage even on customized feeds)
+    const images = document.querySelectorAll('img[src*="ytimg.com/vi"], img[src*="ytimg.com/vi_webp"]');
+    images.forEach((img) => {
+      const container = img.closest('ytd-thumbnail, #thumbnail, .ytp-videowall-still') || img.parentElement;
+      if (container) {
+        processThumbnail(container, img);
       }
     });
   }
 
-  /**
-   * Display the halfway video frame on an image
-   */
+  function processImage(img) {
+    const container = img.closest('ytd-thumbnail, #thumbnail, .ytp-videowall-still') || img.parentElement;
+    if (container) {
+      processThumbnail(container, img);
+    }
+  }
+
+  function processThumbnail(container, img) {
+    const videoId = container.dataset.debaitVideoId || resolveVideoId(container, img);
+    if (!videoId) return;
+
+    container.dataset.debaitVideoId = videoId;
+
+    // Cache original creator image attributes safely
+    if (!img.dataset.debaitOrigSrc) {
+      const initialSrc = img.currentSrc || img.src || img.getAttribute('src');
+      if (initialSrc && !initialSrc.includes('_2.jpg') && !initialSrc.includes('/2.jpg')) {
+        img.dataset.debaitOrigSrc = initialSrc;
+      }
+    }
+
+    if (img.getAttribute('srcset') && !img.dataset.debaitOrigSrcset) {
+      img.dataset.debaitOrigSrcset = img.getAttribute('srcset');
+    }
+
+    const halfwayUrl = getHalfwayUrl(videoId, settings.quality);
+    img.dataset.debaitHalfwaySrc = halfwayUrl;
+
+    // Setup per-video flip button
+    setupIndividualFlipButton(container, img, videoId);
+
+    // Check manual override
+    const override = container.dataset.debaitManualOverride;
+    const shouldShowHalfway = override !== undefined
+      ? override === 'true'
+      : settings.enabled;
+
+    if (shouldShowHalfway) {
+      showHalfwayThumbnail(container, img, videoId, halfwayUrl);
+    } else {
+      showOriginalThumbnail(container, img);
+    }
+  }
+
   function showHalfwayThumbnail(container, img, videoId, halfwayUrl) {
-    if (img.dataset.debaitState === 'halfway' && img.src.includes('_2.jpg')) {
+    if (img.dataset.debaitState === 'halfway' && (img.src.includes('_2.jpg') || img.src.includes('/2.jpg'))) {
       updateBadge(container, true);
       return;
     }
 
-    // Dynamic fallback chain on error: hq720_2 -> hq2 -> 2.jpg
     img.onerror = () => {
       const fallback = getFallbackUrl(img.src, videoId);
-      if (fallback) {
+      if (fallback && img.src !== fallback) {
         img.src = fallback;
       }
     };
@@ -264,14 +316,10 @@ function getFallbackUrl(currentUrl, videoId) {
 
     updateBadge(container, true);
     updateFlipButtonTooltip(container, 'halfway');
-    swappedCount++;
   }
 
-  /**
-   * Revert thumbnail back to creator's original uploaded image
-   */
   function showOriginalThumbnail(container, img) {
-    if (img.dataset.debaitState === 'original' && !img.src.includes('_2.jpg')) {
+    if (img.dataset.debaitState === 'original' && !img.src.includes('_2.jpg') && !img.src.includes('/2.jpg')) {
       updateBadge(container, false);
       return;
     }
@@ -290,9 +338,6 @@ function getFallbackUrl(currentUrl, videoId) {
     updateFlipButtonTooltip(container, 'original');
   }
 
-  /**
-   * Updates or removes the "50%" badge on a thumbnail container
-   */
   function updateBadge(container, isHalfway) {
     let badge = container.querySelector('.debait-thumbnail-badge');
 
@@ -301,8 +346,8 @@ function getFallbackUrl(currentUrl, videoId) {
         badge = document.createElement('div');
         badge.className = 'debait-thumbnail-badge';
         badge.innerHTML = `
-          <svg viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4zm-6.75 11.25L10 17l-1.25-1.75L7 14l1.75-1.25L10 11l1.25 1.75L13 14l-1.75 1.25z"/></svg>
-          <span>50%</span>
+          <span class="debait-badge-dot"></span>
+          <span class="debait-badge-text">50% MIDPOINT</span>
         `;
         container.appendChild(badge);
       }
@@ -312,9 +357,6 @@ function getFallbackUrl(currentUrl, videoId) {
     }
   }
 
-  /**
-   * Creates or updates the per-thumbnail flip toggle button
-   */
   function setupIndividualFlipButton(container, img, videoId) {
     if (!settings.showIndividualToggle) {
       const existingBtn = container.querySelector('.debait-flip-btn');
@@ -328,8 +370,8 @@ function getFallbackUrl(currentUrl, videoId) {
       btn.className = 'debait-flip-btn';
       btn.type = 'button';
       btn.innerHTML = `
-        <svg viewBox="0 0 24 24">
-          <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+        <svg viewBox="0 0 24 24" width="14" height="14">
+          <path fill="currentColor" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
         </svg>
       `;
 
@@ -363,15 +405,12 @@ function getFallbackUrl(currentUrl, videoId) {
     if (!btn) return;
 
     if (currentState === 'halfway') {
-      btn.title = 'DeBait: Showing halfway frame. Click to view creator thumbnail.';
+      btn.title = 'Showing 50% midpoint frame. Click to view creator thumbnail.';
     } else {
-      btn.title = 'DeBait: Showing creator thumbnail. Click to view halfway frame.';
+      btn.title = 'Showing creator thumbnail. Click to view 50% midpoint frame.';
     }
   }
 
-  /**
-   * Inject or update the global toggle switch in YouTube's masthead
-   */
   function injectNavbarToggle() {
     if (!settings.showNavbarToggle) {
       const existing = document.getElementById('debait-navbar-toggle-container');
@@ -385,7 +424,7 @@ function getFallbackUrl(currentUrl, videoId) {
     }
 
     const mastheadButtons = document.querySelector(
-      'ytd-masthead #end #buttons, #masthead-container #end #buttons, ytd-masthead #end'
+      'ytd-masthead #end #buttons, #masthead-container #end #buttons, ytd-masthead #end, #masthead #end'
     );
 
     if (!mastheadButtons) return;
@@ -393,18 +432,19 @@ function getFallbackUrl(currentUrl, videoId) {
     const toggleWrapper = document.createElement('div');
     toggleWrapper.id = 'debait-navbar-toggle-container';
 
-    const toggleBtn = document.createElement('div');
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
     toggleBtn.className = `debait-navbar-toggle ${settings.enabled ? 'is-active' : 'is-disabled'}`;
-    toggleBtn.title = 'DeBait: Toggle between halfway video frames and creator thumbnails (Alt+H)';
+    toggleBtn.title = 'DeBait: Toggle between midpoint frames and creator thumbnails (Alt+H)';
 
     toggleBtn.innerHTML = `
-      <div class="debait-toggle-icon">
-        <svg viewBox="0 0 24 24" width="18" height="18">
-          <path fill="currentColor" d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 9l-4 2.5V8l4 3z"/>
-        </svg>
+      <div class="debait-nav-pill-content">
+        <span class="debait-status-light"></span>
+        <span class="debait-nav-label">DeBait</span>
+        <div class="debait-nav-switch">
+          <div class="debait-nav-switch-thumb"></div>
+        </div>
       </div>
-      <span class="debait-toggle-label">DeBait</span>
-      <div class="debait-toggle-pill"></div>
     `;
 
     toggleBtn.addEventListener('click', (e) => {
@@ -441,35 +481,12 @@ function getFallbackUrl(currentUrl, videoId) {
     }
   }
 
-  /**
-   * Applies the current global settings across all thumbnails on the page
-   */
   function applySettingsToAll() {
-    const containers = document.querySelectorAll(
-      'ytd-thumbnail, #thumbnail.ytd-thumbnail, .ytp-videowall-still, ytd-playlist-video-renderer #thumbnail'
-    );
-
-    containers.forEach((container) => {
-      const img = container.querySelector('img#img, img.yt-core-image, img');
-      if (!img) return;
-
-      const videoId = container.dataset.debaitVideoId || extractVideoId(container, img);
-      if (!videoId) return;
-
-      const halfwayUrl = getHalfwayUrl(videoId, settings.quality);
-
-      if (settings.enabled) {
-        showHalfwayThumbnail(container, img, videoId, halfwayUrl);
-      } else {
-        showOriginalThumbnail(container, img);
-      }
-
-      setupIndividualFlipButton(container, img, videoId);
-    });
+    scanAndProcessAll();
   }
 })();
 
-// Export for Node.js automated test runner
+// Export for automated unit test runner
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     extractVideoIdFromUrl,

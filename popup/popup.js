@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const masterToggle = document.getElementById('master-toggle');
   const statusBadge = document.getElementById('status-badge');
   const statusLabel = document.getElementById('status-label');
-  const heroCard = document.querySelector('.hero-card');
+  const heroCard = document.getElementById('hero-card') || document.querySelector('.hero-surface');
 
   const settingNavbar = document.getElementById('setting-navbar');
   const settingFlipBtn = document.getElementById('setting-flip-btn');

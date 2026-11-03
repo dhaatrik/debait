@@ -74,6 +74,7 @@ DeBait was engineered with a strict **zero-dependency, maximum-performance** phi
 | Technology | Role | Justification |
 | :--- | :--- | :--- |
 | **Vanilla JavaScript (ES6+)** | Core Runtime | Eliminates compilation and bundling overhead, guarantees microsecond execution speeds, and removes external supply-chain risks. |
+| **Declarative Net Request** | Network Interception | Intercepts and redirects thumbnail requests directly in the browser network layer for instantaneous, zero-flicker keyframe swaps. |
 | **Manifest V3** | Extension Standard | Modern Chrome Extensions specification utilizing Service Workers (`background.js`), scoped permissions, and a strict Content Security Policy (CSP). |
 | **Chrome Storage API** | State Management | `chrome.storage.sync` enables asynchronous, persistent settings synchronization across multiple devices and tabs without page reloads. |
 | **CSS3 Custom Properties** | Injected UI Theme | Utilizes YouTube's native design tokens (e.g., `--yt-spec-text-primary`, `--yt-spec-badge-chip-background`) so injected controls automatically adapt to Dark and Light modes. |
