@@ -1,0 +1,27 @@
+{
+  "name": "debait",
+  "version": "1.0.0",
+  "description": "DeBait — Browser extension that replaces clickbait YouTube thumbnails with genuine halfway video frames.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "lint": "node -c background.js content/content.js popup/popup.js",
+    "package": "powershell -Command \"Compress-Archive -Path manifest.json, background.js, icons, content, popup, README.md, LICENSE, CHROMEWEBSTORE.md -DestinationPath debait-v1.0.0.zip -Force\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dhaatrik/debait.git"
+  },
+  "keywords": [
+    "chrome-extension",
+    "youtube",
+    "thumbnails",
+    "anti-clickbait",
+    "manifest-v3"
+  ],
+  "author": "Dhaatrik Chowdhury",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/dhaatrik/debait/issues"
+  },
+  "homepage": "https://github.com/dhaatrik/debait#readme"
+}

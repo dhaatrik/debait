@@ -3,7 +3,51 @@
  * Content Script - Injects halfway video frames and interactive toggles
  */
 
+// Pure helper functions (exported for automated unit testing)
+function extractVideoIdFromUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+
+  // Standard watch URL: watch?v=...
+  const vParam = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (vParam) return vParam[1];
+
+  // YouTube Shorts: /shorts/...
+  const shortsParam = url.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (shortsParam) return shortsParam[1];
+
+  // YouTube Embed: /embed/...
+  const embedParam = url.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
+  if (embedParam) return embedParam[1];
+
+  // CDN image endpoints: /vi/<ID>/ or /vi_webp/<ID>/
+  const cdnMatch = url.match(/\/(?:vi|vi_webp)\/([a-zA-Z0-9_-]{11})\//);
+  if (cdnMatch) return cdnMatch[1];
+
+  return null;
+}
+
+function getHalfwayUrl(videoId, quality = 'high') {
+  if (!videoId || typeof videoId !== 'string') return null;
+  return quality === 'high'
+    ? `https://i.ytimg.com/vi/${videoId}/hq720_2.jpg`
+    : `https://i.ytimg.com/vi/${videoId}/hq2.jpg`;
+}
+
+function getFallbackUrl(currentUrl, videoId) {
+  if (!currentUrl || !videoId) return null;
+  if (currentUrl.includes('hq720_2.jpg')) {
+    return `https://i.ytimg.com/vi/${videoId}/hq2.jpg`;
+  } else if (currentUrl.includes('hq2.jpg')) {
+    return `https://i.ytimg.com/vi/${videoId}/2.jpg`;
+  }
+  return null;
+}
+
+// Browser content script execution
 (() => {
+  // Only execute DOM logic in browser environment with chrome.storage available
+  if (typeof window === 'undefined' || typeof chrome === 'undefined' || !chrome.storage) return;
+
   // Guard against multiple injections
   if (window.__debaitInitialized) return;
   window.__debaitInitialized = true;
@@ -123,25 +167,22 @@
       container.closest('ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer')?.querySelector('a#thumbnail, a#video-title-link');
 
     if (anchor && anchor.href) {
-      const vParam = anchor.href.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
-      if (vParam) return vParam[1];
-
-      const shortsParam = anchor.href.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
-      if (shortsParam) return shortsParam[1];
+      const id = extractVideoIdFromUrl(anchor.href);
+      if (id) return id;
     }
 
     // 2. Check image src or currentSrc directly
     const srcToCheck = (img && (img.currentSrc || img.src || img.getAttribute('src'))) || '';
     if (srcToCheck) {
-      const match = srcToCheck.match(/\/(?:vi|vi_webp)\/([a-zA-Z0-9_-]{11})\//);
-      if (match) return match[1];
+      const id = extractVideoIdFromUrl(srcToCheck);
+      if (id) return id;
     }
 
     // 3. Check srcset if present
     const srcSet = img && img.getAttribute('srcset');
     if (srcSet) {
-      const match = srcSet.match(/\/(?:vi|vi_webp)\/([a-zA-Z0-9_-]{11})\//);
-      if (match) return match[1];
+      const id = extractVideoIdFromUrl(srcSet);
+      if (id) return id;
     }
 
     return null;
@@ -151,13 +192,11 @@
    * Processes all thumbnail containers on the current page
    */
   function processThumbnails() {
-    // Target common YouTube thumbnail containers
     const containers = document.querySelectorAll(
       'ytd-thumbnail, #thumbnail.ytd-thumbnail, .ytp-videowall-still, ytd-playlist-video-renderer #thumbnail'
     );
 
     containers.forEach((container) => {
-      // Find the actual image element
       const img = container.querySelector('img#img, img.yt-core-image, img');
       if (!img) return;
 
@@ -166,7 +205,7 @@
 
       container.dataset.debaitVideoId = videoId;
 
-      // Ensure original source is preserved once
+      // Preserve original source once
       if (!img.dataset.debaitOrigSrc) {
         const initialSrc = img.currentSrc || img.src || img.getAttribute('src');
         if (initialSrc && !initialSrc.includes('_2.jpg') && !initialSrc.includes('/2.jpg')) {
@@ -178,18 +217,13 @@
         img.dataset.debaitOrigSrcset = img.getAttribute('srcset');
       }
 
-      // Generate halfway URL
-      const halfwayUrl = settings.quality === 'high'
-        ? `https://i.ytimg.com/vi/${videoId}/hq720_2.jpg`
-        : `https://i.ytimg.com/vi/${videoId}/hq2.jpg`;
-
+      const halfwayUrl = getHalfwayUrl(videoId, settings.quality);
       img.dataset.debaitHalfwaySrc = halfwayUrl;
 
-      // Handle individual flip button
+      // Setup per-thumbnail flip button
       setupIndividualFlipButton(container, img, videoId);
 
-      // Apply current view (halfway vs original)
-      // Check if container has a manual per-video override
+      // Determine display mode (check manual override or global)
       const override = container.dataset.debaitManualOverride;
       const shouldShowHalfway = override !== undefined
         ? override === 'true'
@@ -208,17 +242,15 @@
    */
   function showHalfwayThumbnail(container, img, videoId, halfwayUrl) {
     if (img.dataset.debaitState === 'halfway' && img.src.includes('_2.jpg')) {
-      // Already showing halfway frame
       updateBadge(container, true);
       return;
     }
 
-    // Set error fallback: hq720_2 -> hq2 -> 2.jpg
+    // Dynamic fallback chain on error: hq720_2 -> hq2 -> 2.jpg
     img.onerror = () => {
-      if (img.src.includes('hq720_2.jpg')) {
-        img.src = `https://i.ytimg.com/vi/${videoId}/hq2.jpg`;
-      } else if (img.src.includes('hq2.jpg')) {
-        img.src = `https://i.ytimg.com/vi/${videoId}/2.jpg`;
+      const fallback = getFallbackUrl(img.src, videoId);
+      if (fallback) {
+        img.src = fallback;
       }
     };
 
@@ -301,7 +333,6 @@
         </svg>
       `;
 
-      // Crucial: stop propagation so clicking doesn't navigate to the video
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -311,9 +342,7 @@
 
         container.dataset.debaitManualOverride = willBeHalfway ? 'true' : 'false';
 
-        const halfwayUrl = settings.quality === 'high'
-          ? `https://i.ytimg.com/vi/${videoId}/hq720_2.jpg`
-          : `https://i.ytimg.com/vi/${videoId}/hq2.jpg`;
+        const halfwayUrl = getHalfwayUrl(videoId, settings.quality);
 
         if (willBeHalfway) {
           showHalfwayThumbnail(container, img, videoId, halfwayUrl);
@@ -355,7 +384,6 @@
       return;
     }
 
-    // Try finding YouTube's top bar buttons container
     const mastheadButtons = document.querySelector(
       'ytd-masthead #end #buttons, #masthead-container #end #buttons, ytd-masthead #end'
     );
@@ -386,7 +414,6 @@
       const newEnabled = !settings.enabled;
       settings.enabled = newEnabled;
 
-      // Clear manual overrides on toggle so entire page aligns
       document.querySelectorAll('[data-debait-manual-override]').forEach((el) => {
         delete el.dataset.debaitManualOverride;
       });
@@ -429,9 +456,7 @@
       const videoId = container.dataset.debaitVideoId || extractVideoId(container, img);
       if (!videoId) return;
 
-      const halfwayUrl = settings.quality === 'high'
-        ? `https://i.ytimg.com/vi/${videoId}/hq720_2.jpg`
-        : `https://i.ytimg.com/vi/${videoId}/hq2.jpg`;
+      const halfwayUrl = getHalfwayUrl(videoId, settings.quality);
 
       if (settings.enabled) {
         showHalfwayThumbnail(container, img, videoId, halfwayUrl);
@@ -443,3 +468,12 @@
     });
   }
 })();
+
+// Export for Node.js automated test runner
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    extractVideoIdFromUrl,
+    getHalfwayUrl,
+    getFallbackUrl
+  };
+}

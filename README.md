@@ -189,34 +189,22 @@ By default, the global toggle is mapped to <kbd>Alt</kbd> + <kbd>H</kbd>. To cus
 
 ## Testing & Quality Assurance
 
-### 1. Structural Integrity & Manifest Audit
-Validates that all manifest targets, icons, content scripts, and assets resolve correctly:
+### 1. Automated Test Suite (Zero Dependencies)
+Runs the test suite using Node.js's built-in `node:test` runner, verifying YouTube URL parsing, edge-case video ID extraction, resolution fallback chains, and Manifest V3 asset schema:
 
 ```bash
-node -e "
-const fs = require('fs');
-const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
-console.log('Validating Manifest V3 schema for:', manifest.name);
-Object.values(manifest.icons).forEach(f => { if (!fs.existsSync(f)) throw new Error('Missing icon: ' + f); });
-manifest.content_scripts.forEach(cs => cs.js.concat(cs.css).forEach(f => { if (!fs.existsSync(f)) throw new Error('Missing script: ' + f); }));
-console.log('All assets and paths successfully verified.');
-"
+npm test
 ```
 
-### 2. JavaScript Syntax Verification
+### 2. JavaScript Syntax Compilation Check
 Ensures all background, content, and popup scripts compile cleanly with zero syntax errors:
 
 ```bash
-node -c background.js content/content.js popup/popup.js
+npm run lint
 ```
 
-### 3. Build Distribution Bundle
-To package the extension into an archive for distribution:
-
-```bash
-# Windows PowerShell
-Compress-Archive -Path manifest.json, background.js, icons, content, popup, README.md, LICENSE, CHROMEWEBSTORE.md -DestinationPath debait-v1.0.0.zip -Force
-```
+### 3. Continuous Integration
+All tests and syntax checks run automatically via GitHub Actions on every push and pull request to `main`.
 
 ---
 
@@ -224,7 +212,11 @@ Compress-Archive -Path manifest.json, background.js, icons, content, popup, READ
 
 ```text
 debait/
-|-- manifest.json              # Chrome Manifest V3 metadata, permissions & routing
+|-- .github/
+|   `-- workflows/
+|       |-- ci.yml            # Automated CI test runner on push & PR
+|       `-- release.yml       # Automated tag-driven packaging & GitHub Release
+|-- manifest.json             # Chrome Manifest V3 metadata, permissions & routing
 |-- background.js             # Service Worker: storage sync, badges & hotkeys
 |-- content/
 |   |-- content.js            # Injected DOM engine: ID parser, frame swap & observer
@@ -237,6 +229,10 @@ debait/
 |   |-- icon-16.png           # 16x16px browser action icon
 |   |-- icon-48.png           # 48x48px extensions manager icon
 |   `-- icon-128.png          # 128x128px high-DPI & web store icon
+|-- tests/
+|   |-- parser.test.js        # Unit tests for URL parser, fallbacks & ID resolver
+|   `-- manifest.test.js      # Manifest schema, permissions & asset presence tests
+|-- package.json              # Zero-dependency test & lint task definitions
 |-- CHROMEWEBSTORE.md         # Official Web Store metadata, justifications & privacy policy
 |-- LICENSE                   # Open-source MIT License
 `-- README.md                 # Project documentation & engineering manual

@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.0.1)'
+        required: true
+
+jobs:
+  build-and-release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run Syntax & Unit Tests
+        run: |
+          npm run lint
+          npm test
+
+      - name: Extract & Verify Version
+        id: version
+        run: |
+          RAW_TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          CLEAN_VERSION="${RAW_TAG#v}"
+          MANIFEST_VERSION=$(node -p "require('./manifest.json').version")
+          
+          echo "Target Release Version: $CLEAN_VERSION"
+          echo "Manifest Version: $MANIFEST_VERSION"
+
+          if [ "$CLEAN_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "::error::Release version ($CLEAN_VERSION) does not match manifest.json version ($MANIFEST_VERSION)"
+            exit 1
+          fi
+
+          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$CLEAN_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Package Extension Distribution ZIP
+        run: |
+          ZIP_NAME="debait-${{ steps.version.outputs.tag }}.zip"
+          zip -r "$ZIP_NAME" manifest.json background.js content popup icons README.md LICENSE CHROMEWEBSTORE.md
+          echo "Package created: $ZIP_NAME"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "DeBait ${{ steps.version.outputs.tag }}"
+          tag_name: ${{ steps.version.outputs.tag }}
+          files: debait-*.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
