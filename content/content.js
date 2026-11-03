@@ -41,7 +41,14 @@ function getFallbackUrl(currentUrl, videoId) {
 
 // Browser content script execution
 (() => {
-  if (typeof window === 'undefined' || typeof chrome === 'undefined' || !chrome.storage) return;
+  if (typeof window === 'undefined' || typeof chrome === 'undefined') return;
+
+  function isContextValid() {
+    return typeof chrome !== 'undefined' && !!chrome?.runtime?.id;
+  }
+
+  // Prevent injection in cross-origin or ad/widget iframes
+  if (window.top !== window.self) return;
 
   const DEFAULTS = {
     enabled: true,
@@ -67,7 +74,7 @@ function getFallbackUrl(currentUrl, videoId) {
 
   function resolveIdFromContext(img) {
     const anchor = img.closest('a') ||
-      img.closest('ytd-thumbnail, ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer')?.querySelector('a#thumbnail, a#video-title-link, a[href*="watch?v="]');
+      img.closest('ytd-thumbnail, ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-reel-item-renderer')?.querySelector('a#thumbnail, a#video-title-link, a[href*="watch?v="], a[href*="/shorts/"]');
     if (anchor && anchor.href) {
       return extractVideoIdFromUrl(anchor.href);
     }
@@ -206,6 +213,11 @@ function getFallbackUrl(currentUrl, videoId) {
   }
 
   const observer = new MutationObserver((mutations) => {
+    if (!isContextValid()) {
+      observer.disconnect();
+      return;
+    }
+
     let shouldScan = false;
 
     for (let i = 0; i < mutations.length; i++) {
@@ -223,7 +235,7 @@ function getFallbackUrl(currentUrl, videoId) {
       }
 
       if (m.type === 'attributes') {
-        if (m.attributeName === 'src' && m.target.tagName === 'IMG') {
+        if ((m.attributeName === 'src' || m.attributeName === 'srcset') && m.target.tagName === 'IMG') {
           processImg(m.target);
         } else if (m.attributeName === 'style') {
           processBg(m.target);
@@ -387,8 +399,14 @@ function getFallbackUrl(currentUrl, videoId) {
         revertAll();
       }
 
-      // Persist in background asynchronously
-      chrome.storage.sync.set({ enabled: newEnabled });
+      // Persist in background asynchronously with context protection
+      if (isContextValid()) {
+        try {
+          chrome.storage.sync.set({ enabled: newEnabled });
+        } catch (_) {
+          // Extension context reloaded
+        }
+      }
     });
 
     toggleWrapper.appendChild(toggleBtn);
@@ -411,11 +429,13 @@ function getFallbackUrl(currentUrl, videoId) {
   // ---- Bootstrap & Navigation Listeners -------------------------------------
 
   function start() {
+    if (!isContextValid()) return;
+
     observer.observe(document.documentElement, {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ['src', 'style'],
+      attributeFilter: ['src', 'srcset', 'style'],
     });
 
     if (settings.enabled) {
@@ -425,16 +445,19 @@ function getFallbackUrl(currentUrl, videoId) {
 
     // YouTube SPA navigation events
     window.addEventListener('yt-navigate-finish', () => {
+      if (!isContextValid()) return;
       if (settings.enabled) scheduleScan();
       injectNavbarToggle();
     });
 
     window.addEventListener('yt-page-data-updated', () => {
+      if (!isContextValid()) return;
       if (settings.enabled) scheduleScan();
     });
 
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => {
+        if (!isContextValid()) return;
         if (settings.enabled) scanImmediate();
         injectNavbarToggle();
       });
@@ -442,41 +465,54 @@ function getFallbackUrl(currentUrl, videoId) {
   }
 
   // React instantly to external changes (Popup toggle or keyboard shortcut Alt+H)
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'sync') return;
-    let hasRelevantChange = false;
-    let enabledChanged = false;
+  if (typeof chrome !== 'undefined' && chrome?.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (!isContextValid() || area !== 'sync') {
+        if (!isContextValid()) observer.disconnect();
+        return;
+      }
 
-    for (const [key, { newValue }] of Object.entries(changes)) {
-      if (key in settings) {
-        if (settings[key] !== newValue) {
-          hasRelevantChange = true;
-          if (key === 'enabled') {
-            enabledChanged = true;
+      let hasRelevantChange = false;
+      let enabledChanged = false;
+
+      for (const [key, { newValue }] of Object.entries(changes)) {
+        if (key in settings) {
+          if (settings[key] !== newValue) {
+            hasRelevantChange = true;
+            if (key === 'enabled') {
+              enabledChanged = true;
+            }
           }
+          settings[key] = newValue;
         }
-        settings[key] = newValue;
       }
-    }
 
-    if (!hasRelevantChange) return;
+      if (!hasRelevantChange) return;
 
-    updateNavbarToggleState();
+      updateNavbarToggleState();
 
-    // Instant zero-lag synchronous flip
-    if (enabledChanged) {
-      if (!settings.enabled) {
-        revertAll();
-      } else {
-        scanImmediate();
+      // Instant zero-lag synchronous flip
+      if (enabledChanged) {
+        if (!settings.enabled) {
+          revertAll();
+        } else {
+          scanImmediate();
+        }
       }
-    }
-  });
+    });
+  }
 
-  chrome.storage.sync.get(DEFAULTS, (stored) => {
-    settings = { ...DEFAULTS, ...stored };
-    start();
-  });
+  if (!isContextValid() || !chrome?.storage?.sync) return;
+
+  try {
+    chrome.storage.sync.get(DEFAULTS, (stored) => {
+      if (!isContextValid() || (chrome.runtime && chrome.runtime.lastError)) return;
+      settings = { ...DEFAULTS, ...stored };
+      start();
+    });
+  } catch (_) {
+    // Context invalidated during startup
+  }
 })();
 
 // Export for automated unit test runner
