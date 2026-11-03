@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Honest Thumbnails</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-group">
+        <img src="../icons/icon-48.png" alt="Logo" class="logo-icon">
+        <div class="title-wrapper">
+          <h1 class="title">Honest Thumbnails</h1>
+          <span class="version">v1.0.0</span>
+        </div>
+      </div>
+      <div class="status-indicator active" id="status-badge">
+        <span class="dot"></span>
+        <span class="status-text" id="status-label">Active</span>
+      </div>
+    </header>
+
+    <!-- Master Switch Hero Card -->
+    <div class="hero-card">
+      <div class="hero-info">
+        <h2 class="hero-title">Halfway Thumbnails</h2>
+        <p class="hero-desc">Display honest frames from 50% into the video</p>
+      </div>
+      <label class="switch-container">
+        <input type="checkbox" id="master-toggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- Quick Action / Shortcut Hint -->
+    <div class="shortcut-tip">
+      <span class="shortcut-icon">⚡</span>
+      <span class="shortcut-text">Press <kbd>Alt</kbd> + <kbd>H</kbd> on YouTube to toggle instantly</span>
+    </div>
+
+    <!-- Settings Group -->
+    <div class="settings-group">
+      <h3 class="section-label">Options</h3>
+
+      <!-- Top Bar Toggle -->
+      <div class="setting-item">
+        <div class="setting-info">
+          <span class="setting-name">Top Bar Toggle</span>
+          <span class="setting-desc">Add a 1-click toggle button to YouTube's header</span>
+        </div>
+        <label class="switch-container small">
+          <input type="checkbox" id="setting-navbar" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Hover Flip Button -->
+      <div class="setting-item">
+        <div class="setting-info">
+          <span class="setting-name">Hover Flip Button</span>
+          <span class="setting-desc">Flip single thumbnails with a button on hover</span>
+        </div>
+        <label class="switch-container small">
+          <input type="checkbox" id="setting-flip-btn" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Corner Badge -->
+      <div class="setting-item">
+        <div class="setting-info">
+          <span class="setting-name">"50%" Frame Badge</span>
+          <span class="setting-desc">Show indicator tag on replaced thumbnails</span>
+        </div>
+        <label class="switch-container small">
+          <input type="checkbox" id="setting-badge" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- HD Quality -->
+      <div class="setting-item">
+        <div class="setting-info">
+          <span class="setting-name">Prefer HD Quality (720p)</span>
+          <span class="setting-desc">Use crisp 1280×720 frames whenever available</span>
+        </div>
+        <label class="switch-container small">
+          <input type="checkbox" id="setting-quality" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Footer Note -->
+    <footer class="footer">
+      <p>Bypassing sensational clickbait with real video frames.</p>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

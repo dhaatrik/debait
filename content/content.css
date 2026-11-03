@@ -1,0 +1,197 @@
+/* Honest Thumbnails for YouTube - Content Styles */
+
+/* ==========================================================================
+   1. Masthead Navbar Toggle
+   ========================================================================== */
+#honest-navbar-toggle-container {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 12px;
+  vertical-align: middle;
+}
+
+.honest-navbar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--yt-spec-badge-chip-background, rgba(255, 255, 255, 0.1));
+  color: var(--yt-spec-text-primary, #ffffff);
+  border: 1px solid var(--yt-spec-10-percent-layer, rgba(255, 255, 255, 0.15));
+  border-radius: 18px;
+  padding: 4px 10px;
+  font-family: "Roboto", "Segoe UI", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  box-sizing: border-box;
+}
+
+.honest-navbar-toggle:hover {
+  background: var(--yt-spec-button-chip-background-hover, rgba(255, 255, 255, 0.2));
+  border-color: var(--yt-spec-text-secondary, rgba(255, 255, 255, 0.3));
+  transform: translateY(-1px);
+}
+
+.honest-navbar-toggle:active {
+  transform: translateY(0);
+}
+
+.honest-navbar-toggle .honest-toggle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #00c853;
+  transition: color 0.2s ease;
+}
+
+.honest-navbar-toggle.is-disabled .honest-toggle-icon {
+  color: var(--yt-spec-text-secondary, #aaaaaa);
+}
+
+.honest-navbar-toggle .honest-toggle-label {
+  line-height: 1;
+  letter-spacing: 0.2px;
+}
+
+.honest-navbar-toggle .honest-toggle-pill {
+  width: 32px;
+  height: 18px;
+  background: #444;
+  border-radius: 10px;
+  position: relative;
+  transition: background 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.honest-navbar-toggle.is-active .honest-toggle-pill {
+  background: #00c853;
+}
+
+.honest-navbar-toggle .honest-toggle-pill::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.honest-navbar-toggle.is-active .honest-toggle-pill::after {
+  transform: translateX(14px);
+}
+
+/* ==========================================================================
+   2. Thumbnail Badges & Overlay Elements
+   ========================================================================== */
+ytd-thumbnail,
+#thumbnail.ytd-thumbnail,
+.ytp-videowall-still,
+ytd-compact-video-renderer ytd-thumbnail,
+ytd-rich-grid-media ytd-thumbnail {
+  position: relative;
+}
+
+/* Ensure images scale crisply with aspect fill */
+ytd-thumbnail img[data-honest-state="halfway"] {
+  object-fit: cover !important;
+}
+
+/* Halfway Frame Corner Badge */
+.honest-thumbnail-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #00e676;
+  font-family: "Roboto", "Segoe UI", Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: none;
+  border: 1px solid rgba(0, 230, 118, 0.35);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  animation: honestFadeIn 0.2s ease-out;
+}
+
+.honest-thumbnail-badge svg {
+  width: 11px;
+  height: 11px;
+  fill: currentColor;
+}
+
+/* Per-video thumbnail hover flip button */
+.honest-flip-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 12;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(15, 15, 15, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding: 0;
+}
+
+/* Show button when parent thumbnail is hovered */
+ytd-thumbnail:hover .honest-flip-btn,
+#thumbnail:hover .honest-flip-btn,
+ytd-compact-video-renderer:hover .honest-flip-btn,
+ytd-rich-grid-media:hover .honest-flip-btn,
+.ytp-videowall-still:hover .honest-flip-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.honest-flip-btn:hover {
+  background: #00c853;
+  color: #000000;
+  border-color: #00c853;
+  transform: scale(1.12);
+}
+
+.honest-flip-btn:active {
+  transform: scale(0.95);
+}
+
+.honest-flip-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+/* Flip animation helper */
+@keyframes honestFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
