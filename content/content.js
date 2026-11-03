@@ -84,12 +84,16 @@ function getFallbackUrl(currentUrl, videoId) {
   // ---- High-Performance, Instant Image Swapper (0ms Latency) ----------------
 
   function processImg(img) {
-    const src = img.getAttribute('src') || '';
-    if (img.dataset.debait && src === img.dataset.debait) return; // Already on midpoint
+    if (!isContextValid()) return;
 
+    // Shield against infinite mutation cycles: ignore if already managed and active
+    if (img.dataset.debaitActive === 'true' && settings.enabled) return;
+
+    const src = img.src || img.getAttribute('src') || '';
     const id = parseThumbUrl(src) || resolveIdFromContext(img);
     if (!id) return;
 
+    // Cache genuine creator thumbnail for instant rollback
     if (src && !src.startsWith('data:') && !src.includes('hq720_2') && !src.includes('hq2.jpg') && !src.includes('/2.jpg')) {
       if (!img.dataset.debaitOrig) {
         img.dataset.debaitOrig = src;
@@ -111,6 +115,9 @@ function getFallbackUrl(currentUrl, videoId) {
       return;
     }
 
+    // Lock element BEFORE mutating attributes to shield against MutationObserver feedback loops
+    img.dataset.debaitActive = 'true';
+
     // Instant zero-lag swap: assign immediately without network probe delay
     const halfwayUrl = getHalfwayUrl(id, settings.quality);
     img.dataset.debait = halfwayUrl;
@@ -126,11 +133,27 @@ function getFallbackUrl(currentUrl, videoId) {
       if (fallback && img.src !== fallback) {
         img.src = fallback;
         img.dataset.debait = fallback;
+        img.style.opacity = '1';
+        img.style.visibility = 'visible';
       }
     };
 
     img.src = halfwayUrl;
     img.style.objectFit = 'cover';
+
+    // Overcome YouTube Polymer/Lit hidden image state
+    img.classList.add('yt-core-image--loaded');
+    img.style.opacity = '1';
+    img.style.visibility = 'visible';
+    img.style.display = 'block';
+
+    const wrapper = img.closest('yt-image, yt-img-shadow');
+    if (wrapper) {
+      wrapper.setAttribute('loaded', '');
+      wrapper.classList.remove('empty');
+      wrapper.style.opacity = '1';
+      wrapper.style.visibility = 'visible';
+    }
 
     if (container) {
       container.dataset.debaitState = 'halfway';
@@ -140,6 +163,8 @@ function getFallbackUrl(currentUrl, videoId) {
   }
 
   function restoreImg(img, container) {
+    img.dataset.debaitActive = 'false';
+
     if (img.dataset.debaitOrig) {
       img.src = img.dataset.debaitOrig;
       delete img.dataset.debait;
@@ -223,19 +248,23 @@ function getFallbackUrl(currentUrl, videoId) {
     for (let i = 0; i < mutations.length; i++) {
       const m = mutations[i];
 
-      // Skip mutations from DeBait's own controls to prevent cycles
-      if (
-        m.target &&
-        m.target.classList &&
-        (m.target.classList.contains('debait-thumbnail-badge') ||
-         m.target.classList.contains('debait-flip-btn') ||
-         m.target.classList.contains('debait-navbar-toggle'))
-      ) {
-        continue;
+      // Skip DeBait's own controls and active images to prevent recursion
+      if (m.target) {
+        if (m.target.dataset && m.target.dataset.debaitActive === 'true') {
+          continue;
+        }
+        if (
+          m.target.classList &&
+          (m.target.classList.contains('debait-thumbnail-badge') ||
+           m.target.classList.contains('debait-flip-btn') ||
+           m.target.classList.contains('debait-navbar-toggle'))
+        ) {
+          continue;
+        }
       }
 
       if (m.type === 'attributes') {
-        if ((m.attributeName === 'src' || m.attributeName === 'srcset') && m.target.tagName === 'IMG') {
+        if (m.attributeName === 'src' && m.target.tagName === 'IMG') {
           processImg(m.target);
         } else if (m.attributeName === 'style') {
           processBg(m.target);
@@ -435,7 +464,7 @@ function getFallbackUrl(currentUrl, videoId) {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ['src', 'srcset', 'style'],
+      attributeFilter: ['src', 'style'],
     });
 
     if (settings.enabled) {

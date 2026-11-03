@@ -97,17 +97,41 @@
    2. Thumbnail Badges & Micro-Interactions
    ========================================================================== */
 ytd-thumbnail,
-#thumbnail.ytd-thumbnail,
+#thumbnail,
 .ytp-videowall-still,
 ytd-compact-video-renderer ytd-thumbnail,
 ytd-rich-grid-media ytd-thumbnail {
   position: relative !important;
 }
 
-/* Ensure clean scaling for 16:9 frames */
-ytd-thumbnail img[data-debait-state="halfway"],
-#thumbnail img[data-debait-state="halfway"] {
+/* Force video thumbnail images and Polymer wrappers to remain visible */
+ytd-thumbnail yt-image img,
+ytd-thumbnail yt-img-shadow img,
+ytd-thumbnail #img,
+ytd-thumbnail img.yt-core-image,
+ytd-thumbnail img,
+#thumbnail img,
+.ytp-videowall-still-image {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
   object-fit: cover !important;
+}
+
+ytd-thumbnail yt-image,
+ytd-thumbnail yt-img-shadow {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+yt-img-shadow:not([loaded]) #img {
+  display: block !important;
+  opacity: 1 !important;
+}
+
+.yt-core-image:not(.yt-core-image--loaded) {
+  opacity: 1 !important;
 }
 
 /* Stageshow Frosted Glass 50% Midpoint Badge */
