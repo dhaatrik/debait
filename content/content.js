@@ -83,8 +83,10 @@ function getFallbackUrl(currentUrl, videoId) {
     const id = parseThumbUrl(src) || resolveIdFromContext(img);
     if (!id) return;
 
-    if (!img.dataset.debaitOrig) {
-      img.dataset.debaitOrig = src;
+    if (src && !src.startsWith('data:') && !src.includes('hq720_2') && !src.includes('hq2.jpg') && !src.includes('/2.jpg')) {
+      if (!img.dataset.debaitOrig) {
+        img.dataset.debaitOrig = src;
+      }
     }
 
     const container = img.closest('ytd-thumbnail, #thumbnail, .ytp-videowall-still') || img.parentElement;
@@ -134,6 +136,12 @@ function getFallbackUrl(currentUrl, videoId) {
     if (img.dataset.debaitOrig) {
       img.src = img.dataset.debaitOrig;
       delete img.dataset.debait;
+    } else {
+      const id = container?.dataset?.debaitVideoId;
+      if (id) {
+        img.src = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+        delete img.dataset.debait;
+      }
     }
     if (img.dataset.debaitSrcset) {
       img.setAttribute('srcset', img.dataset.debaitSrcset);
@@ -436,17 +444,32 @@ function getFallbackUrl(currentUrl, videoId) {
   // React instantly to external changes (Popup toggle or keyboard shortcut Alt+H)
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync') return;
+    let hasRelevantChange = false;
+    let enabledChanged = false;
+
     for (const [key, { newValue }] of Object.entries(changes)) {
-      if (key in settings) settings[key] = newValue;
+      if (key in settings) {
+        if (settings[key] !== newValue) {
+          hasRelevantChange = true;
+          if (key === 'enabled') {
+            enabledChanged = true;
+          }
+        }
+        settings[key] = newValue;
+      }
     }
+
+    if (!hasRelevantChange) return;
 
     updateNavbarToggleState();
 
     // Instant zero-lag synchronous flip
-    if (!settings.enabled) {
-      revertAll();
-    } else {
-      scanImmediate();
+    if (enabledChanged) {
+      if (!settings.enabled) {
+        revertAll();
+      } else {
+        scanImmediate();
+      }
     }
   });
 
