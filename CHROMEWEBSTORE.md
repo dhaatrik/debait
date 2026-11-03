@@ -1,19 +1,19 @@
-# Chrome Web Store Listing — Honest Thumbnails for YouTube™
+# Chrome Web Store Listing — DeBait for YouTube™
 
 > Last Updated: 2026-11-03
 
 ## Store Listing
 
 **Extension Name**
-Honest Thumbnails for YouTube™
+DeBait — Honest YouTube Thumbnails
 
 **Short Description**
-Replaces clickbait YouTube thumbnails with real frames from halfway through the video. Toggle between them anytime with 1 click.
+DeBait replaces clickbait YouTube thumbnails with real frames from halfway through the video. Toggle between them anytime with 1 click.
 
 **Detailed Description**
 See what is actually in the video before you click.
 
-Honest Thumbnails automatically replaces misleading, exaggerated, or clickbait thumbnails on YouTube with honest, unaltered frames captured directly from halfway (50%) through the video.
+DeBait automatically replaces misleading, exaggerated, or clickbait thumbnails on YouTube with honest, unaltered frames captured directly from halfway (50%) through the video.
 
 Key Features:
 - Automatic Replacement: Every video thumbnail across your home feed, search results, subscriptions, and recommendations automatically displays a genuine frame from the video midpoint.
@@ -26,11 +26,11 @@ Key Features:
 How to Use:
 1. Install the extension and open YouTube.
 2. Thumbnails will automatically display genuine midpoint frames.
-3. Click the "Halfway" toggle in YouTube's top bar or press Alt+H to switch back to creator thumbnails whenever you want.
+3. Click the "DeBait" toggle in YouTube's top bar or press Alt+H to switch back to creator thumbnails whenever you want.
 4. Click the extension icon in your browser toolbar to customize badges, quality, and toggle visibility.
 
 Privacy First:
-Honest Thumbnails runs entirely locally within your browser. It does not track your browsing history, does not collect personal data, and makes zero connections to third-party tracking servers.
+DeBait runs entirely locally within your browser. It does not track your browsing history, does not collect personal data, and makes zero connections to third-party tracking servers.
 
 **Category**
 Productivity
@@ -73,7 +73,7 @@ English
 - **External Servers**: None. All image assets are loaded directly from YouTube's official content delivery network (`i.ytimg.com`).
 
 ### Privacy Policy
-Honest Thumbnails does not collect, transmit, store, or sell any personal or browsing information. All preferences and states remain on the user's local device.
+DeBait does not collect, transmit, store, or sell any personal or browsing information. All preferences and states remain on the user's local device.
 
 ---
 

@@ -1,4 +1,4 @@
-// Honest Thumbnails for YouTube - Background Service Worker
+// DeBait for YouTube - Background Service Worker
 
 const DEFAULT_SETTINGS = {
   enabled: true,

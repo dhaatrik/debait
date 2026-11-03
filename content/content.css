@@ -1,16 +1,16 @@
-/* Honest Thumbnails for YouTube - Content Styles */
+/* DeBait for YouTube - Content Styles */
 
 /* ==========================================================================
    1. Masthead Navbar Toggle
    ========================================================================== */
-#honest-navbar-toggle-container {
+#debait-navbar-toggle-container {
   display: inline-flex;
   align-items: center;
   margin-right: 12px;
   vertical-align: middle;
 }
 
-.honest-navbar-toggle {
+.debait-navbar-toggle {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -28,17 +28,17 @@
   box-sizing: border-box;
 }
 
-.honest-navbar-toggle:hover {
+.debait-navbar-toggle:hover {
   background: var(--yt-spec-button-chip-background-hover, rgba(255, 255, 255, 0.2));
   border-color: var(--yt-spec-text-secondary, rgba(255, 255, 255, 0.3));
   transform: translateY(-1px);
 }
 
-.honest-navbar-toggle:active {
+.debait-navbar-toggle:active {
   transform: translateY(0);
 }
 
-.honest-navbar-toggle .honest-toggle-icon {
+.debait-navbar-toggle .debait-toggle-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -46,16 +46,17 @@
   transition: color 0.2s ease;
 }
 
-.honest-navbar-toggle.is-disabled .honest-toggle-icon {
+.debait-navbar-toggle.is-disabled .debait-toggle-icon {
   color: var(--yt-spec-text-secondary, #aaaaaa);
 }
 
-.honest-navbar-toggle .honest-toggle-label {
+.debait-navbar-toggle .debait-toggle-label {
   line-height: 1;
   letter-spacing: 0.2px;
+  font-weight: 600;
 }
 
-.honest-navbar-toggle .honest-toggle-pill {
+.debait-navbar-toggle .debait-toggle-pill {
   width: 32px;
   height: 18px;
   background: #444;
@@ -64,11 +65,11 @@
   transition: background 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.honest-navbar-toggle.is-active .honest-toggle-pill {
+.debait-navbar-toggle.is-active .debait-toggle-pill {
   background: #00c853;
 }
 
-.honest-navbar-toggle .honest-toggle-pill::after {
+.debait-navbar-toggle .debait-toggle-pill::after {
   content: "";
   position: absolute;
   top: 2px;
@@ -81,7 +82,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-.honest-navbar-toggle.is-active .honest-toggle-pill::after {
+.debait-navbar-toggle.is-active .debait-toggle-pill::after {
   transform: translateX(14px);
 }
 
@@ -97,12 +98,12 @@ ytd-rich-grid-media ytd-thumbnail {
 }
 
 /* Ensure images scale crisply with aspect fill */
-ytd-thumbnail img[data-honest-state="halfway"] {
+ytd-thumbnail img[data-debait-state="halfway"] {
   object-fit: cover !important;
 }
 
 /* Halfway Frame Corner Badge */
-.honest-thumbnail-badge {
+.debait-thumbnail-badge {
   position: absolute;
   top: 6px;
   left: 6px;
@@ -123,17 +124,17 @@ ytd-thumbnail img[data-honest-state="halfway"] {
   pointer-events: none;
   border: 1px solid rgba(0, 230, 118, 0.35);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-  animation: honestFadeIn 0.2s ease-out;
+  animation: debaitFadeIn 0.2s ease-out;
 }
 
-.honest-thumbnail-badge svg {
+.debait-thumbnail-badge svg {
   width: 11px;
   height: 11px;
   fill: currentColor;
 }
 
 /* Per-video thumbnail hover flip button */
-.honest-flip-btn {
+.debait-flip-btn {
   position: absolute;
   top: 6px;
   right: 6px;
@@ -158,34 +159,34 @@ ytd-thumbnail img[data-honest-state="halfway"] {
 }
 
 /* Show button when parent thumbnail is hovered */
-ytd-thumbnail:hover .honest-flip-btn,
-#thumbnail:hover .honest-flip-btn,
-ytd-compact-video-renderer:hover .honest-flip-btn,
-ytd-rich-grid-media:hover .honest-flip-btn,
-.ytp-videowall-still:hover .honest-flip-btn {
+ytd-thumbnail:hover .debait-flip-btn,
+#thumbnail:hover .debait-flip-btn,
+ytd-compact-video-renderer:hover .debait-flip-btn,
+ytd-rich-grid-media:hover .debait-flip-btn,
+.ytp-videowall-still:hover .debait-flip-btn {
   opacity: 1;
   transform: scale(1);
 }
 
-.honest-flip-btn:hover {
+.debait-flip-btn:hover {
   background: #00c853;
   color: #000000;
   border-color: #00c853;
   transform: scale(1.12);
 }
 
-.honest-flip-btn:active {
+.debait-flip-btn:active {
   transform: scale(0.95);
 }
 
-.honest-flip-btn svg {
+.debait-flip-btn svg {
   width: 15px;
   height: 15px;
   fill: currentColor;
 }
 
 /* Flip animation helper */
-@keyframes honestFadeIn {
+@keyframes debaitFadeIn {
   from {
     opacity: 0;
     transform: translateY(-2px);

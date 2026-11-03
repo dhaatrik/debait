@@ -1,6 +1,6 @@
-# Honest Thumbnails for YouTube™
+# DeBait for YouTube™ 🎯
 
-> **Show what's actually in the video.** Automatically replaces clickbait YouTube thumbnails with genuine video frames captured from the exact midpoint (50% halfway mark) of each video, with instant 1-click toggling between the honest frame and the creator's uploaded thumbnail.
+> **Show what's actually in the video.** DeBait automatically replaces clickbait YouTube thumbnails with genuine video frames captured from the exact midpoint (50% halfway mark) of each video, with instant 1-click toggling between the honest frame and the creator's uploaded thumbnail.
 
 ---
 
@@ -30,16 +30,13 @@ This extension is built with **Manifest V3** and runs on any modern Chromium-bas
 
 ### Step 3: Load the Extension
 1. Click the **"Load unpacked"** button in the top-left corner.
-2. Select the folder containing this extension:
-   ```
-   E:\E Drive Projects\00 Github\honest-thumbnail
-   ```
+2. Select this project folder.
 3. Click **Select Folder**.
 
 ### Step 4: Pin & Enjoy!
 1. Click the puzzle piece icon (Extensions menu) in your browser toolbar.
-2. Click the pin icon next to **Honest Thumbnails for YouTube™**.
-3. Open or refresh [youtube.com](https://www.youtube.com). All video thumbnails will now display the halfway frame!
+2. Click the pin icon next to **DeBait — Honest YouTube Thumbnails**.
+3. Open or refresh [youtube.com](https://www.youtube.com). All video thumbnails will now display genuine halfway frames!
 
 ---
 
@@ -63,14 +60,14 @@ YouTube automatically captures and stores keyframes from videos on its high-spee
 - `https://i.ytimg.com/vi/<VIDEO_ID>/hq2.jpg` — 480×360 (universal fallback frame at the 50% midpoint)
 - `https://i.ytimg.com/vi/<VIDEO_ID>/2.jpg` — 120×90 (low-bandwidth fallback)
 
-**Honest Thumbnails** uses a lightweight `MutationObserver` and YouTube SPA navigation listener to detect video containers. It preserves the original thumbnail URLs, extracts the 11-character video ID, and seamlessly loads the halfway frame with automatic error-fallback chains. When toggled back, the creator's high-res thumbnail and `srcset` are restored instantly without re-fetching.
+**DeBait** uses a lightweight `MutationObserver` and YouTube SPA navigation listener to detect video containers. It preserves the original thumbnail URLs, extracts the 11-character video ID, and seamlessly loads the halfway frame with automatic error-fallback chains. When toggled back, the creator's high-res thumbnail and `srcset` are restored instantly without re-fetching.
 
 ---
 
 ## 📁 File Structure
 
 ```
-honest-thumbnail/
+debait/
 ├── manifest.json              # Chrome Manifest V3 configuration
 ├── background.js             # Service worker: settings & keyboard shortcuts
 ├── content/
@@ -84,6 +81,7 @@ honest-thumbnail/
 │   ├── icon-16.png           # 16x16 icon
 │   ├── icon-48.png           # 48x48 icon
 │   └── icon-128.png          # 128x128 icon
+├── LICENSE                   # MIT License
 ├── CHROMEWEBSTORE.md         # Store listing metadata & privacy justifications
 └── README.md                 # Documentation and user guide
 ```
@@ -91,4 +89,4 @@ honest-thumbnail/
 ---
 
 ## 📄 License
-MIT License. Free and open source.
+[MIT License](LICENSE) © 2026 dhaatrik. Free and open source.

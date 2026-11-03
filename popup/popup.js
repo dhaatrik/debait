@@ -1,4 +1,4 @@
-// Honest Thumbnails - Popup Controller
+// DeBait for YouTube - Popup Controller
 
 document.addEventListener('DOMContentLoaded', async () => {
   const masterToggle = document.getElementById('master-toggle');
