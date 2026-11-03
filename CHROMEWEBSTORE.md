@@ -79,6 +79,7 @@ DeBait does not collect, transmit, store, or sell any personal or browsing infor
 
 ## Version History
 
+- **v1.0.4** (2026-11-03): Performance overhaul: eliminated async network probe latency for instant (0ms) synchronous thumbnail swapping, debounced DOM scanning with requestAnimationFrame, and decoupled storage persistence.
 - **v1.0.3** (2026-11-03): Re-architected with direct probe and DOM interception engine. Completely eliminated `declarativeNetRequest` to avoid all Chromium RE2 regex memory limit restrictions while maintaining instant, reliable midpoint swaps.
 - **v1.0.2** (2026-11-03): DNR optimization attempt.
 - **v1.0.1** (2026-11-03): Stageshow dark-hero UI revamp.

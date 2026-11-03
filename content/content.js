@@ -1,6 +1,6 @@
 /**
  * DeBait for YouTube™
- * Content Script - Robust thumbnail replacer & Stageshow-crafted controls
+ * Content Script - Zero-lag, high-performance thumbnail replacer
  */
 
 // Pure helper functions (exported for automated unit testing)
@@ -55,38 +55,9 @@ function getFallbackUrl(currentUrl, videoId) {
   const THUMB_RE = /^(?:https?:)?\/\/i\d*\.ytimg\.com\/vi(?:_webp)?\/([\w-]{11})\/(\w+)\.(?:jpg|webp)/;
   const AUTO_FRAME_RE = /^(?:hq|mq|sd|maxres|oar|hq720_)?[123]$/;
   const CSS_URL_RE = /url\(\s*["']?([^"')]+)["']?\s*\)/;
-  const PLACEHOLDER_WIDTH = 120; // YouTube serves 120x90 grey placeholder for missing frames
 
   let settings = { ...DEFAULTS };
-  const probeCache = new Map();
-
-  function probe(url) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => resolve(img.naturalWidth > PLACEHOLDER_WIDTH);
-      img.onerror = () => resolve(false);
-      img.src = url;
-    });
-  }
-
-  function resolveMidpointFrame(id, quality) {
-    const key = `${id}:${quality}`;
-    let promise = probeCache.get(key);
-    if (!promise) {
-      promise = (async () => {
-        const candidates = quality === 'high'
-          ? [`${ORIGIN}/vi/${id}/hq720_2.jpg`, `${ORIGIN}/vi/${id}/hq2.jpg`]
-          : [`${ORIGIN}/vi/${id}/hq2.jpg`];
-
-        for (const url of candidates) {
-          if (await probe(url)) return url;
-        }
-        return `${ORIGIN}/vi/${id}/hq2.jpg`; // Ultimate fallback
-      })();
-      probeCache.set(key, promise);
-    }
-    return promise;
-  }
+  let isScanScheduled = false;
 
   function parseThumbUrl(url) {
     const m = url && THUMB_RE.exec(url);
@@ -94,11 +65,20 @@ function getFallbackUrl(currentUrl, videoId) {
     return m[1];
   }
 
-  // ---- <img> Element Processing ---------------------------------------------
+  function resolveIdFromContext(img) {
+    const anchor = img.closest('a') ||
+      img.closest('ytd-thumbnail, ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer')?.querySelector('a#thumbnail, a#video-title-link, a[href*="watch?v="]');
+    if (anchor && anchor.href) {
+      return extractVideoIdFromUrl(anchor.href);
+    }
+    return null;
+  }
+
+  // ---- High-Performance, Instant Image Swapper (0ms Latency) ----------------
 
   function processImg(img) {
     const src = img.getAttribute('src') || '';
-    if (img.dataset.debait && src === img.dataset.debait) return; // Already processed
+    if (img.dataset.debait && src === img.dataset.debait) return; // Already on midpoint
 
     const id = parseThumbUrl(src) || resolveIdFromContext(img);
     if (!id) return;
@@ -122,25 +102,32 @@ function getFallbackUrl(currentUrl, videoId) {
       return;
     }
 
-    resolveMidpointFrame(id, settings.quality).then((url) => {
-      if (!url || img.getAttribute('src') !== src) return;
+    // Instant zero-lag swap: assign immediately without network probe delay
+    const halfwayUrl = getHalfwayUrl(id, settings.quality);
+    img.dataset.debait = halfwayUrl;
 
-      img.dataset.debait = url;
+    if (img.hasAttribute('srcset') && !img.dataset.debaitSrcset) {
+      img.dataset.debaitSrcset = img.getAttribute('srcset');
+      img.removeAttribute('srcset');
+    }
 
-      if (img.hasAttribute('srcset') && !img.dataset.debaitSrcset) {
-        img.dataset.debaitSrcset = img.getAttribute('srcset');
-        img.removeAttribute('srcset');
+    // Background fallback: if 720p is unavailable (e.g. vintage 240p video), fall back to hq2
+    img.onerror = () => {
+      const fallback = getFallbackUrl(img.src, id);
+      if (fallback && img.src !== fallback) {
+        img.src = fallback;
+        img.dataset.debait = fallback;
       }
+    };
 
-      img.src = url;
-      img.style.objectFit = 'cover';
+    img.src = halfwayUrl;
+    img.style.objectFit = 'cover';
 
-      if (container) {
-        container.dataset.debaitState = 'halfway';
-        updateBadge(container, true);
-        updateFlipButtonTooltip(container, 'halfway');
-      }
-    });
+    if (container) {
+      container.dataset.debaitState = 'halfway';
+      updateBadge(container, true);
+      updateFlipButtonTooltip(container, 'halfway');
+    }
   }
 
   function restoreImg(img, container) {
@@ -176,39 +163,47 @@ function getFallbackUrl(currentUrl, videoId) {
     el.dataset.debaitBgOrig = bg;
     if (!settings.enabled) return;
 
-    resolveMidpointFrame(id, settings.quality).then((url) => {
-      if (!url || !settings.enabled || el.style.backgroundImage !== bg) return;
-      el.dataset.debaitBg = url;
-      el.style.backgroundImage = `url("${url}")`;
+    const halfwayUrl = getHalfwayUrl(id, settings.quality);
+    el.dataset.debaitBg = halfwayUrl;
+    el.style.backgroundImage = `url("${halfwayUrl}")`;
+  }
+
+  // ---- Fast Targeted Scanning & Debounced Observation -----------------------
+
+  function scanImmediate() {
+    // 1. Fast query for thumbnail images directly
+    const imgs = document.querySelectorAll('ytd-thumbnail img, #thumbnail img, img[src*="ytimg.com/vi"]');
+    for (let i = 0; i < imgs.length; i++) {
+      processImg(imgs[i]);
+    }
+
+    // 2. Background image elements
+    const bgs = document.querySelectorAll('.ytp-videowall-still-image, [style*="ytimg.com/vi"]');
+    for (let i = 0; i < bgs.length; i++) {
+      processBg(bgs[i]);
+    }
+  }
+
+  function scheduleScan() {
+    if (isScanScheduled) return;
+    isScanScheduled = true;
+
+    requestAnimationFrame(() => {
+      if (settings.enabled) {
+        scanImmediate();
+      }
+      injectNavbarToggle();
+      isScanScheduled = false;
     });
   }
 
-  function resolveIdFromContext(img) {
-    const anchor = img.closest('a') ||
-      img.closest('ytd-thumbnail, ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer')?.querySelector('a#thumbnail, a#video-title-link, a[href*="watch?v="]');
-    if (anchor && anchor.href) {
-      return extractVideoIdFromUrl(anchor.href);
-    }
-    return null;
-  }
-
-  // ---- DOM Scanning & MutationObserver --------------------------------------
-
-  function scan(root) {
-    if (!root || (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_NODE)) return;
-
-    if (root.tagName === 'IMG') processImg(root);
-    else if (root.getAttribute && root.getAttribute('style')) processBg(root);
-
-    const imgs = root.querySelectorAll ? root.querySelectorAll('img[src*="ytimg.com/vi"]') : [];
-    for (const img of imgs) processImg(img);
-
-    const bgs = root.querySelectorAll ? root.querySelectorAll('[style*="ytimg.com/vi"]') : [];
-    for (const el of bgs) processBg(el);
-  }
-
   const observer = new MutationObserver((mutations) => {
-    for (const m of mutations) {
+    let shouldScan = false;
+
+    for (let i = 0; i < mutations.length; i++) {
+      const m = mutations[i];
+
+      // Skip mutations from DeBait's own controls to prevent cycles
       if (
         m.target &&
         m.target.classList &&
@@ -220,23 +215,34 @@ function getFallbackUrl(currentUrl, videoId) {
       }
 
       if (m.type === 'attributes') {
-        if (m.attributeName === 'src') {
-          if (m.target.tagName === 'IMG') processImg(m.target);
+        if (m.attributeName === 'src' && m.target.tagName === 'IMG') {
+          processImg(m.target);
         } else if (m.attributeName === 'style') {
           processBg(m.target);
         }
-      } else {
-        for (const node of m.addedNodes) scan(node);
+      } else if (m.addedNodes.length > 0) {
+        shouldScan = true;
       }
+    }
+
+    if (shouldScan) {
+      scheduleScan();
     }
   });
 
+  // ---- Instant Synchronous Revert (Toggle OFF) -----------------------------
+
   function revertAll() {
-    for (const img of document.querySelectorAll('img[data-debait-orig]')) {
+    const modifiedImgs = document.querySelectorAll('img[data-debait-orig]');
+    for (let i = 0; i < modifiedImgs.length; i++) {
+      const img = modifiedImgs[i];
       const container = img.closest('ytd-thumbnail, #thumbnail, .ytp-videowall-still') || img.parentElement;
       restoreImg(img, container);
     }
-    for (const el of document.querySelectorAll('[data-debait-bg-orig]')) {
+
+    const modifiedBgs = document.querySelectorAll('[data-debait-bg-orig]');
+    for (let i = 0; i < modifiedBgs.length; i++) {
+      const el = modifiedBgs[i];
       if (el.dataset.debaitBgOrig) {
         el.style.backgroundImage = el.dataset.debaitBgOrig;
         delete el.dataset.debaitBg;
@@ -365,14 +371,16 @@ function getFallbackUrl(currentUrl, videoId) {
         delete el.dataset.debaitManualOverride;
       });
 
-      chrome.storage.sync.set({ enabled: newEnabled }, () => {
-        updateNavbarToggleState();
-        if (newEnabled) {
-          scan(document);
-        } else {
-          revertAll();
-        }
-      });
+      // Synchronous instant visual feedback on click (0ms delay)
+      updateNavbarToggleState();
+      if (newEnabled) {
+        scanImmediate();
+      } else {
+        revertAll();
+      }
+
+      // Persist in background asynchronously
+      chrome.storage.sync.set({ enabled: newEnabled });
     });
 
     toggleWrapper.appendChild(toggleBtn);
@@ -392,7 +400,7 @@ function getFallbackUrl(currentUrl, videoId) {
     }
   }
 
-  // ---- Bootstrap -----------------------------------------------------------
+  // ---- Bootstrap & Navigation Listeners -------------------------------------
 
   function start() {
     observer.observe(document.documentElement, {
@@ -402,36 +410,43 @@ function getFallbackUrl(currentUrl, videoId) {
       attributeFilter: ['src', 'style'],
     });
 
-    if (settings.enabled) scan(document);
+    if (settings.enabled) {
+      scanImmediate();
+    }
     injectNavbarToggle();
 
+    // YouTube SPA navigation events
     window.addEventListener('yt-navigate-finish', () => {
-      if (settings.enabled) scan(document);
+      if (settings.enabled) scheduleScan();
       injectNavbarToggle();
     });
 
     window.addEventListener('yt-page-data-updated', () => {
-      if (settings.enabled) scan(document);
+      if (settings.enabled) scheduleScan();
     });
 
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => {
-        if (settings.enabled) scan(document);
+        if (settings.enabled) scanImmediate();
         injectNavbarToggle();
       });
     }
   }
 
+  // React instantly to external changes (Popup toggle or keyboard shortcut Alt+H)
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync') return;
     for (const [key, { newValue }] of Object.entries(changes)) {
       if (key in settings) settings[key] = newValue;
     }
+
     updateNavbarToggleState();
+
+    // Instant zero-lag synchronous flip
     if (!settings.enabled) {
       revertAll();
     } else {
-      scan(document);
+      scanImmediate();
     }
   });
 
