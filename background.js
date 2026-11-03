@@ -1,11 +1,11 @@
 // DeBait for YouTube - Background Service Worker
 // Network-level keyframe redirection engine (declarativeNetRequest)
 
-const RULE_ID_MIDPOINT = 1;
+const RULE_IDS = [1, 2, 3];
 
 const DEFAULT_SETTINGS = {
   enabled: true,
-  quality: 'high', // 'high' = hq720_2.jpg (1280x720 HD), 'standard' = hq2.jpg (480x360)
+  quality: 'high', // 'high' = hq720_2.jpg, 'standard' = hq2.jpg
   showBadge: true,
   showNavbarToggle: true,
   showIndividualToggle: true
@@ -52,34 +52,79 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
 // Configure declarativeNetRequest dynamic redirect rules
 async function updateRedirectRules(enabled, quality) {
   try {
-    if (!enabled) {
-      await chrome.declarativeNetRequest.updateDynamicRules({
-        removeRuleIds: [RULE_ID_MIDPOINT]
-      });
-      return;
-    }
+    // Always clear existing rules first
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: RULE_IDS
+    });
+
+    if (!enabled) return;
 
     const targetFile = quality === 'high' ? 'hq720_2' : 'hq2';
 
-    await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [RULE_ID_MIDPOINT],
-      addRules: [
-        {
-          id: RULE_ID_MIDPOINT,
-          priority: 1,
-          action: {
-            type: 'redirect',
-            redirect: {
-              // Redirect to midpoint frame while preserving query params
-              regexSubstitution: `https://i.ytimg.com/vi/\\1/${targetFile}.jpg\\2`
-            }
-          },
-          condition: {
-            regexFilter: '^https://i[0-9]?\\.ytimg\\.com/(?:vi|vi_webp)/([a-zA-Z0-9_-]{11})/(?:default|hqdefault|mqdefault|sddefault|hq720)(?:_custom_[0-9]+)?\\.(?:jpg|webp)(.*)',
-            resourceTypes: ['image']
+    // Three lightweight, linear rules (<200 bytes compiled memory each, well below 2KB limit)
+    const newRules = [
+      // 1. HD thumbnails (hq720.jpg)
+      {
+        id: 1,
+        priority: 1,
+        action: {
+          type: 'redirect',
+          redirect: {
+            regexSubstitution: `https://i.ytimg.com/vi/\\1/${targetFile}.jpg`
           }
+        },
+        condition: {
+          regexFilter: '^https://i[0-9]?\\.ytimg\\.com/vi/([^/]+)/hq720(?:\\.jpg|_custom).*',
+          resourceTypes: ['image']
         }
-      ]
+      },
+      // 2. Default & medium quality thumbnails (hqdefault, mqdefault, sddefault, default)
+      {
+        id: 2,
+        priority: 1,
+        action: {
+          type: 'redirect',
+          redirect: {
+            regexSubstitution: `https://i.ytimg.com/vi/\\1/${targetFile}.jpg`
+          }
+        },
+        condition: {
+          regexFilter: '^https://i[0-9]?\\.ytimg\\.com/vi/([^/]+)/(?:hq|mq|sd)?default(?:\\.jpg|_custom).*',
+          resourceTypes: ['image']
+        }
+      },
+      // 3. WebP variations
+      {
+        id: 3,
+        priority: 1,
+        action: {
+          type: 'redirect',
+          redirect: {
+            regexSubstitution: `https://i.ytimg.com/vi/\\1/${targetFile}.jpg`
+          }
+        },
+        condition: {
+          regexFilter: '^https://i[0-9]?\\.ytimg\\.com/vi_webp/([^/]+)/[a-z0-9_]+(?:\\.webp|_custom).*',
+          resourceTypes: ['image']
+        }
+      }
+    ];
+
+    // Verify regex memory safety before applying
+    if (chrome.declarativeNetRequest.isRegexSupported) {
+      for (const rule of newRules) {
+        const check = await chrome.declarativeNetRequest.isRegexSupported({
+          regex: rule.condition.regexFilter
+        });
+        if (!check.isSupported) {
+          console.warn('DeBait: regex not supported, skipping rule:', rule.id, check.reason);
+          return;
+        }
+      }
+    }
+
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      addRules: newRules
     });
   } catch (err) {
     console.error('DeBait: Failed to update declarativeNetRequest rules:', err);

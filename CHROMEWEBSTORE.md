@@ -81,5 +81,6 @@ DeBait does not collect, transmit, store, or sell any personal or browsing infor
 
 ## Version History
 
+- **v1.0.2** (2026-11-03): Split declarativeNetRequest into 3 linear, ultra-lightweight rules (<200 bytes DFA memory) to strictly comply with Chromium's 2KB regex memory limit, with automated regex safety checks.
 - **v1.0.1** (2026-11-03): Stageshow dark-hero UI revamp. Added network-level interception via `declarativeNetRequest` for zero-flicker instant replacement, capture-phase lazy-load interception, and `*://*.ytimg.com/*` host permissions.
 - **v1.0.0** (2026-11-03): Initial release. Full halfway frame replacement (HD 720p with fallback), top navigation bar toggle switch, individual hover flip button, corner 50% badges, keyboard shortcut (`Alt+H`), and settings popup.
