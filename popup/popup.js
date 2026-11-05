@@ -11,6 +11,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const settingBadge = document.getElementById('setting-badge');
   const settingQuality = document.getElementById('setting-quality');
 
+  // Dynamic version binding from manifest
+  const manifest = chrome.runtime?.getManifest?.();
+  const versionEl = document.getElementById('brand-version');
+  if (versionEl && manifest?.version) {
+    versionEl.textContent = `v${manifest.version}`;
+  }
+
   // Load existing settings
   const settings = await chrome.storage.sync.get({
     enabled: true,

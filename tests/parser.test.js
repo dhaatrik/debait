@@ -28,6 +28,26 @@ describe('Video ID Parser', () => {
     assert.equal(extractVideoIdFromUrl(url), '9bZkp7q19f0');
   });
 
+  test('extracts video ID from YouTube Live stream URL', () => {
+    const url = 'https://www.youtube.com/live/dQw4w9WgXcQ';
+    assert.equal(extractVideoIdFromUrl(url), 'dQw4w9WgXcQ');
+  });
+
+  test('extracts video ID from YouTube Live stream URL with trailing query', () => {
+    const url = 'https://www.youtube.com/live/dQw4w9WgXcQ?feature=share';
+    assert.equal(extractVideoIdFromUrl(url), 'dQw4w9WgXcQ');
+  });
+
+  test('extracts video ID from youtu.be short URL', () => {
+    const url = 'https://youtu.be/dQw4w9WgXcQ';
+    assert.equal(extractVideoIdFromUrl(url), 'dQw4w9WgXcQ');
+  });
+
+  test('extracts video ID from youtu.be short URL with trailing query', () => {
+    const url = 'https://youtu.be/dQw4w9WgXcQ?t=120';
+    assert.equal(extractVideoIdFromUrl(url), 'dQw4w9WgXcQ');
+  });
+
   test('extracts video ID from i.ytimg.com JPEG CDN URL', () => {
     const url = 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CL';
     assert.equal(extractVideoIdFromUrl(url), 'dQw4w9WgXcQ');
