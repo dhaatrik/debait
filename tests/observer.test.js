@@ -57,6 +57,7 @@ describe('DOM & Observer Filtering Helpers', () => {
   describe('isShortsElement', () => {
     test('identifies elements inside ytd-reel-item-renderer as Shorts', () => {
       const node = {
+        nodeType: 1,
         closest: (selector) => selector.includes('ytd-reel-item-renderer') ? {} : null,
         matches: () => false
       };
@@ -65,6 +66,7 @@ describe('DOM & Observer Filtering Helpers', () => {
 
     test('identifies elements inside ytd-rich-shelf-renderer[is-shorts] as Shorts', () => {
       const node = {
+        nodeType: 1,
         closest: (selector) => selector.includes('is-shorts') ? {} : null,
         matches: () => false
       };
@@ -73,6 +75,7 @@ describe('DOM & Observer Filtering Helpers', () => {
 
     test('returns false for standard video container elements', () => {
       const node = {
+        nodeType: 1,
         closest: () => null,
         matches: () => false
       };
