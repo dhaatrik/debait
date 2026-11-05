@@ -64,7 +64,6 @@ function getFallbackUrl(currentUrl, videoId) {
     showIndividualToggle: true
   };
 
-  const ORIGIN = 'https://i.ytimg.com';
   const THUMB_RE = /^(?:https?:)?\/\/i\d*\.ytimg\.com\/vi(?:_webp)?\/([\w-]{11})\/(\w+)\.(?:jpg|webp)/;
   const AUTO_FRAME_RE = /^(?:hq|mq|sd|maxres|oar|hq720_)?[123]$/;
   const CSS_URL_RE = /url\(\s*["']?([^"')]+)["']?\s*\)/;
@@ -141,6 +140,19 @@ function getFallbackUrl(currentUrl, videoId) {
         img.dataset.debait = fallback;
         img.style.opacity = '1';
         img.style.visibility = 'visible';
+      } else {
+        img.onerror = null;
+        if (img.dataset.debaitOrig) {
+          img.src = img.dataset.debaitOrig;
+        } else {
+          img.src = `https://i.ytimg.com/vi/${id}/hq720.jpg`;
+        }
+        img.dataset.debaitState = 'original';
+        if (container) {
+          container.dataset.debaitState = 'original';
+          updateBadge(container, false);
+          updateFlipButtonTooltip(container, 'original');
+        }
       }
     };
 
@@ -177,7 +189,7 @@ function getFallbackUrl(currentUrl, videoId) {
     } else {
       const id = container?.dataset?.debaitVideoId;
       if (id) {
-        img.src = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+        img.src = `https://i.ytimg.com/vi/${id}/hq720.jpg`;
         delete img.dataset.debait;
       }
     }
