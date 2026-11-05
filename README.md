@@ -74,7 +74,7 @@ DeBait was engineered with a strict **zero-dependency, maximum-performance** phi
 | Technology | Role | Justification |
 | :--- | :--- | :--- |
 | **Vanilla JavaScript (ES6+)** | Core Runtime | Eliminates compilation and bundling overhead, guarantees microsecond execution speeds, and removes external supply-chain risks. |
-| **Declarative Net Request** | Network Interception | Intercepts and redirects thumbnail requests directly in the browser network layer for instantaneous, zero-flicker keyframe swaps. |
+| **DOM Keyframe Interception** | Keyframe Replacement | Intercepts and swaps thumbnail image elements and attributes directly in the YouTube DOM for instantaneous, zero-flicker keyframe swaps without Chromium regex budget limits. |
 | **Manifest V3** | Extension Standard | Modern Chrome Extensions specification utilizing Service Workers (`background.js`), scoped permissions, and a strict Content Security Policy (CSP). |
 | **Chrome Storage API** | State Management | `chrome.storage.sync` enables asynchronous, persistent settings synchronization across multiple devices and tabs without page reloads. |
 | **CSS3 Custom Properties** | Injected UI Theme | Utilizes YouTube's native design tokens (e.g., `--yt-spec-text-primary`, `--yt-spec-badge-chip-background`) so injected controls automatically adapt to Dark and Light modes. |
@@ -183,7 +183,7 @@ cd debait
 ### Keyboard Shortcut Configuration
 By default, the global toggle is mapped to <kbd>Alt</kbd> + <kbd>H</kbd>. To customize this shortcut:
 1. Open `chrome://extensions/shortcuts` in your browser.
-2. Scroll to **DeBait — Honest YouTube Thumbnails**.
+2. Scroll to **DeBait: Honest YouTube Thumbnails**.
 3. Click the edit icon beside `Toggle between halfway frames and creator thumbnails` and assign your preferred key combination.
 
 ---
@@ -198,14 +198,21 @@ npm test
 ```
 
 ### 2. JavaScript Syntax Compilation Check
-Ensures all background, content, and popup scripts compile cleanly with zero syntax errors:
+Ensures all background, content, popup, and packaging scripts compile cleanly with zero syntax errors:
 
 ```bash
 npm run lint
 ```
 
-### 3. Continuous Integration
-All tests and syntax checks run automatically via GitHub Actions on every push and pull request to `main`.
+### 3. Zero-Dependency Distribution Packager
+Packages the production extension zip into `dist/debait-v1.1.0.zip` using raw Node.js streams without third-party dependencies:
+
+```bash
+npm run package
+```
+
+### 4. Continuous Integration
+All tests, syntax checks, and packaging steps run automatically via GitHub Actions on every push and pull request to `main`.
 
 ---
 
@@ -230,10 +237,15 @@ debait/
 |   |-- icon-16.png           # 16x16px browser action icon
 |   |-- icon-48.png           # 48x48px extensions manager icon
 |   `-- icon-128.png          # 128x128px high-DPI & web store icon
+|-- scripts/
+|   `-- package.js            # Zero-dependency build script creating production zip
 |-- tests/
-|   |-- parser.test.js        # Unit tests for URL parser, fallbacks & ID resolver
-|   `-- manifest.test.js      # Manifest schema, permissions & asset presence tests
-|-- package.json              # Zero-dependency test & lint task definitions
+|   |-- background.test.js    # Service worker lifecycle, sync & hotkey unit tests
+|   |-- content.test.js       # DOM element swap, fallback chain & restore unit tests
+|   |-- manifest.test.js      # Manifest schema, permissions & asset presence tests
+|   |-- observer.test.js      # Mutation observer filtering & Shorts element unit tests
+|   `-- parser.test.js        # Unit tests for URL parser, fallbacks & ID resolver
+|-- package.json              # Zero-dependency test, lint & package task definitions
 |-- CHROMEWEBSTORE.md         # Official Web Store metadata, justifications & privacy policy
 |-- LICENSE                   # Open-source MIT License
 `-- README.md                 # Project documentation & engineering manual

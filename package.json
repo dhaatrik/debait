@@ -1,7 +1,7 @@
 {
   "name": "debait",
-  "version": "1.0.6",
-  "description": "DeBait — Browser extension that replaces clickbait YouTube thumbnails with genuine halfway video frames.",
+  "version": "1.1.0",
+  "description": "DeBait: Browser extension that replaces clickbait YouTube thumbnails with genuine halfway video frames.",
   "scripts": {
     "test": "node --test tests/*.test.js",
     "lint": "node -c background.js content/content.js popup/popup.js scripts/package.js",
