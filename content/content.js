@@ -306,7 +306,8 @@ function isShortsElement(el) {
     });
   }
 
-  const observer = new MutationObserver((mutations) => {
+  const ObserverClass = typeof MutationObserver !== 'undefined' ? MutationObserver : (typeof window !== 'undefined' && window.MutationObserver ? window.MutationObserver : null);
+  const observer = ObserverClass ? new ObserverClass((mutations) => {
     if (!isContextValid()) {
       observer.disconnect();
       return;
@@ -366,7 +367,7 @@ function isShortsElement(el) {
         scheduleScan(document);
       }
     }
-  });
+  }) : null;
 
   // ---- Instant Synchronous Revert (Toggle OFF) -----------------------------
 
@@ -552,12 +553,14 @@ function isShortsElement(el) {
   function start() {
     if (!isContextValid()) return;
 
-    observer.observe(document.documentElement, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: ['src', 'srcset', 'style'],
-    });
+    if (observer) {
+      observer.observe(document.documentElement, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ['src', 'srcset', 'style'],
+      });
+    }
 
     if (settings.enabled) {
       scanImmediate(document);
@@ -613,6 +616,13 @@ function isShortsElement(el) {
     });
   }
 
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports.processImg = processImg;
+    module.exports.restoreImg = restoreImg;
+    module.exports.revertAll = revertAll;
+    module.exports.scanImmediate = scanImmediate;
+  }
+
   if (!isContextValid() || !chrome?.storage?.sync) return;
 
   try {
@@ -628,11 +638,11 @@ function isShortsElement(el) {
 
 // Export for automated unit test runner
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
+  Object.assign(module.exports, {
     extractVideoIdFromUrl,
     getHalfwayUrl,
     getFallbackUrl,
     isDeBaitNode,
     isShortsElement
-  };
+  });
 }
