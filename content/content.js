@@ -10,11 +10,17 @@ function extractVideoIdFromUrl(url) {
   const vParam = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
   if (vParam) return vParam[1];
 
+  const liveParam = url.match(/\/live\/([a-zA-Z0-9_-]{11})/);
+  if (liveParam) return liveParam[1];
+
   const shortsParam = url.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
   if (shortsParam) return shortsParam[1];
 
   const embedParam = url.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
   if (embedParam) return embedParam[1];
+
+  const youtuBeParam = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (youtuBeParam) return youtuBeParam[1];
 
   const cdnMatch = url.match(/\/(?:vi|vi_webp)\/([a-zA-Z0-9_-]{11})\//);
   if (cdnMatch) return cdnMatch[1];
