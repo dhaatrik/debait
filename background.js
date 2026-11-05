@@ -5,7 +5,8 @@ const DEFAULT_SETTINGS = {
   quality: 'high', // 'high' (maxres2 / hq720_2) with fallback to hq2
   showBadge: true,
   showNavbarToggle: true,
-  showIndividualToggle: true
+  showIndividualToggle: true,
+  replaceShorts: false
 };
 
 // Initialize settings and action badge on install

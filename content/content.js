@@ -45,6 +45,24 @@ function getFallbackUrl(currentUrl, videoId) {
   return null;
 }
 
+function isDeBaitNode(node) {
+  if (!node || node.nodeType !== 1) return false;
+  return Boolean(
+    node.classList?.contains('debait-thumbnail-badge') ||
+    node.classList?.contains('debait-flip-btn') ||
+    node.classList?.contains('debait-navbar-toggle') ||
+    node.id === 'debait-navbar-toggle-container'
+  );
+}
+
+function isShortsElement(el) {
+  if (!el || el.nodeType !== 1) return false;
+  return Boolean(
+    el.closest?.('ytd-reel-item-renderer, ytd-rich-shelf-renderer[is-shorts], #shorts-container') ||
+    el.matches?.('ytd-reel-item-renderer, ytd-rich-shelf-renderer[is-shorts], #shorts-container')
+  );
+}
+
 // Browser content script execution
 (() => {
   if (typeof window === 'undefined' || typeof chrome === 'undefined') return;
@@ -61,7 +79,8 @@ function getFallbackUrl(currentUrl, videoId) {
     quality: 'high',
     showBadge: true,
     showNavbarToggle: true,
-    showIndividualToggle: true
+    showIndividualToggle: true,
+    replaceShorts: false
   };
 
   const THUMB_RE = /^(?:https?:)?\/\/i\d*\.ytimg\.com\/vi(?:_webp)?\/([\w-]{11})\/(\w+)\.(?:jpg|webp)/;
@@ -70,6 +89,7 @@ function getFallbackUrl(currentUrl, videoId) {
 
   let settings = { ...DEFAULTS };
   let isScanScheduled = false;
+  const pendingSubtrees = new Set();
 
   function parseThumbUrl(url) {
     const m = url && THUMB_RE.exec(url);
@@ -107,8 +127,19 @@ function getFallbackUrl(currentUrl, videoId) {
 
     const container = img.closest('ytd-thumbnail, #thumbnail, .ytp-videowall-still') || img.parentElement;
     if (container) {
+      if (container.dataset.debaitVideoId && container.dataset.debaitVideoId !== id) {
+        delete container.dataset.debaitManualOverride;
+      }
       container.dataset.debaitVideoId = id;
       setupIndividualFlipButton(container, img, id);
+    }
+
+    // Bypass replacement for vertical Shorts when setting is disabled
+    if (!settings.replaceShorts && (isShortsElement(container) || isShortsElement(img))) {
+      if (img.dataset.debaitActive === 'true') {
+        restoreImg(img, container);
+      }
+      return;
     }
 
     // Check individual override
@@ -132,7 +163,7 @@ function getFallbackUrl(currentUrl, videoId) {
       img.removeAttribute('srcset');
     }
 
-    // Background fallback: if 720p is unavailable (e.g. vintage 240p video), fall back to hq2
+    // Background fallback: if 720p is unavailable, fall back to lower resolutions
     img.onerror = () => {
       const fallback = getFallbackUrl(img.src, id);
       if (fallback && img.src !== fallback) {
@@ -228,28 +259,48 @@ function getFallbackUrl(currentUrl, videoId) {
 
   // ---- Fast Targeted Scanning & Debounced Observation -----------------------
 
-  function scanImmediate() {
-    // 1. Fast query for thumbnail images directly
-    const imgs = document.querySelectorAll('ytd-thumbnail img, #thumbnail img, img[src*="ytimg.com/vi"]');
+  function scanImmediate(root = document) {
+    if (!root || !root.querySelectorAll) return;
+
+    if (root.tagName === 'IMG' && (root.closest?.('ytd-thumbnail, #thumbnail') || (root.src && root.src.includes('ytimg.com/vi')))) {
+      processImg(root);
+    }
+
+    const imgs = root.querySelectorAll('ytd-thumbnail img, #thumbnail img, img[src*="ytimg.com/vi"]');
     for (let i = 0; i < imgs.length; i++) {
       processImg(imgs[i]);
     }
 
-    // 2. Background image elements
-    const bgs = document.querySelectorAll('.ytp-videowall-still-image, [style*="ytimg.com/vi"]');
+    const bgs = root.querySelectorAll('.ytp-videowall-still-image, [style*="ytimg.com/vi"]');
     for (let i = 0; i < bgs.length; i++) {
       processBg(bgs[i]);
     }
   }
 
-  function scheduleScan() {
+  function scheduleScan(subtree = null) {
+    if (subtree && subtree !== document) {
+      pendingSubtrees.add(subtree);
+    } else {
+      pendingSubtrees.clear();
+      pendingSubtrees.add(document);
+    }
+
     if (isScanScheduled) return;
     isScanScheduled = true;
 
     requestAnimationFrame(() => {
       if (settings.enabled) {
-        scanImmediate();
+        if (pendingSubtrees.has(document)) {
+          scanImmediate(document);
+        } else {
+          for (const root of pendingSubtrees) {
+            if (root && (root === document || root.isConnected)) {
+              scanImmediate(root);
+            }
+          }
+        }
       }
+      pendingSubtrees.clear();
       injectNavbarToggle();
       isScanScheduled = false;
     });
@@ -262,38 +313,58 @@ function getFallbackUrl(currentUrl, videoId) {
     }
 
     let shouldScan = false;
+    const subtreesToScan = new Set();
 
     for (let i = 0; i < mutations.length; i++) {
       const m = mutations[i];
 
-      // Skip DeBait's own controls and active images to prevent recursion
+      // Skip DeBait's internal controls and active elements to prevent recursion
       if (m.target) {
         if (m.target.dataset && m.target.dataset.debaitActive === 'true') {
           continue;
         }
-        if (
-          m.target.classList &&
-          (m.target.classList.contains('debait-thumbnail-badge') ||
-           m.target.classList.contains('debait-flip-btn') ||
-           m.target.classList.contains('debait-navbar-toggle'))
-        ) {
+        if (isDeBaitNode(m.target)) {
           continue;
         }
       }
 
       if (m.type === 'attributes') {
-        if (m.attributeName === 'src' && m.target.tagName === 'IMG') {
+        if (m.attributeName === 'srcset' && m.target.tagName === 'IMG') {
+          const img = m.target;
+          if (img.dataset.debaitActive === 'true' && img.hasAttribute('srcset')) {
+            img.dataset.debaitSrcset = img.getAttribute('srcset');
+            img.removeAttribute('srcset');
+          }
+        } else if (m.attributeName === 'src' && m.target.tagName === 'IMG') {
           processImg(m.target);
         } else if (m.attributeName === 'style') {
           processBg(m.target);
         }
-      } else if (m.addedNodes.length > 0) {
-        shouldScan = true;
+      } else if (m.type === 'childList') {
+        let externalNodesAdded = false;
+        for (let j = 0; j < m.addedNodes.length; j++) {
+          const node = m.addedNodes[j];
+          if (!isDeBaitNode(node)) {
+            externalNodesAdded = true;
+            if (node.nodeType === 1) {
+              subtreesToScan.add(node);
+            }
+          }
+        }
+        if (externalNodesAdded) {
+          shouldScan = true;
+        }
       }
     }
 
     if (shouldScan) {
-      scheduleScan();
+      if (subtreesToScan.size > 0) {
+        for (const sub of subtreesToScan) {
+          scheduleScan(sub);
+        }
+      } else {
+        scheduleScan(document);
+      }
     }
   });
 
@@ -363,15 +434,18 @@ function getFallbackUrl(currentUrl, videoId) {
         e.preventDefault();
         e.stopPropagation();
 
-        const currentState = container.dataset.debaitState || 'halfway';
-        const willBeHalfway = currentState !== 'halfway';
+        const targetContainer = btn.closest('ytd-thumbnail, #thumbnail, .ytp-videowall-still') || btn.parentElement;
+        const targetImg = targetContainer?.querySelector('img');
+        if (!targetContainer || !targetImg) return;
 
-        container.dataset.debaitManualOverride = willBeHalfway ? 'true' : 'false';
+        const currentState = targetContainer.dataset.debaitState || 'halfway';
+        const willBeHalfway = currentState !== 'halfway';
+        targetContainer.dataset.debaitManualOverride = willBeHalfway ? 'true' : 'false';
 
         if (willBeHalfway) {
-          processImg(img);
+          processImg(targetImg);
         } else {
-          restoreImg(img, container);
+          restoreImg(targetImg, targetContainer);
         }
       });
 
@@ -441,7 +515,7 @@ function getFallbackUrl(currentUrl, videoId) {
       // Synchronous instant visual feedback on click (0ms delay)
       updateNavbarToggleState();
       if (newEnabled) {
-        scanImmediate();
+        scanImmediate(document);
       } else {
         revertAll();
       }
@@ -482,45 +556,32 @@ function getFallbackUrl(currentUrl, videoId) {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ['src', 'style'],
+      attributeFilter: ['src', 'srcset', 'style'],
     });
 
     if (settings.enabled) {
-      scanImmediate();
+      scanImmediate(document);
     }
-    injectNavbarToggle();
 
-    // YouTube SPA navigation events
     window.addEventListener('yt-navigate-finish', () => {
-      if (!isContextValid()) return;
-      if (settings.enabled) scheduleScan();
-      injectNavbarToggle();
+      scheduleScan(document);
     });
 
-    window.addEventListener('yt-page-data-updated', () => {
-      if (!isContextValid()) return;
-      if (settings.enabled) scheduleScan();
+    window.addEventListener('popstate', () => {
+      scheduleScan(document);
     });
 
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        if (!isContextValid()) return;
-        if (settings.enabled) scanImmediate();
-        injectNavbarToggle();
-      });
-    }
-  }
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== 'sync') return;
 
-  // React instantly to external changes (Popup toggle or keyboard shortcut Alt+H)
-  if (typeof chrome !== 'undefined' && chrome?.storage?.onChanged) {
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (!isContextValid() || area !== 'sync') {
+      if (!isContextValid()) {
         if (!isContextValid()) observer.disconnect();
         return;
       }
 
       let hasRelevantChange = false;
       let enabledChanged = false;
+      let shortsChanged = false;
 
       for (const [key, { newValue }] of Object.entries(changes)) {
         if (key in settings) {
@@ -528,6 +589,8 @@ function getFallbackUrl(currentUrl, videoId) {
             hasRelevantChange = true;
             if (key === 'enabled') {
               enabledChanged = true;
+            } else if (key === 'replaceShorts') {
+              shortsChanged = true;
             }
           }
           settings[key] = newValue;
@@ -538,13 +601,14 @@ function getFallbackUrl(currentUrl, videoId) {
 
       updateNavbarToggleState();
 
-      // Instant zero-lag synchronous flip
       if (enabledChanged) {
         if (!settings.enabled) {
           revertAll();
         } else {
-          scanImmediate();
+          scanImmediate(document);
         }
+      } else if (shortsChanged) {
+        scanImmediate(document);
       }
     });
   }
@@ -567,6 +631,8 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     extractVideoIdFromUrl,
     getHalfwayUrl,
-    getFallbackUrl
+    getFallbackUrl,
+    isDeBaitNode,
+    isShortsElement
   };
 }

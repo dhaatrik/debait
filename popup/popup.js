@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const settingFlipBtn = document.getElementById('setting-flip-btn');
   const settingBadge = document.getElementById('setting-badge');
   const settingQuality = document.getElementById('setting-quality');
+  const settingShorts = document.getElementById('setting-shorts');
 
   // Dynamic version binding from manifest
   const manifest = chrome.runtime?.getManifest?.();
@@ -24,7 +25,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     quality: 'high',
     showBadge: true,
     showNavbarToggle: true,
-    showIndividualToggle: true
+    showIndividualToggle: true,
+    replaceShorts: false
   });
 
   // Apply to UI
@@ -33,6 +35,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   settingFlipBtn.checked = settings.showIndividualToggle;
   settingBadge.checked = settings.showBadge;
   settingQuality.checked = settings.quality === 'high';
+  if (settingShorts) {
+    settingShorts.checked = Boolean(settings.replaceShorts);
+  }
 
   // Master Toggle Change Handler
   masterToggle.addEventListener('change', async (e) => {
@@ -61,6 +66,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const quality = e.target.checked ? 'high' : 'standard';
     await chrome.storage.sync.set({ quality });
   });
+
+  // Shorts Mode Toggle
+  if (settingShorts) {
+    settingShorts.addEventListener('change', async (e) => {
+      await chrome.storage.sync.set({ replaceShorts: e.target.checked });
+    });
+  }
 
   // Helper to sync visual state
   function updateMasterToggleUI(enabled) {
