@@ -47,6 +47,7 @@
 - [Usage Instructions](#usage-instructions)
 - [Testing & Quality Assurance](#testing--quality-assurance)
 - [Project Structure](#project-structure)
+- [Changelog](#changelog)
 - [Contributing](#contributing)
 - [License](#license)
 - [Connect & Inquiries](#connect--inquiries)
@@ -246,6 +247,8 @@ debait/
 |   |-- observer.test.js      # Mutation observer filtering & Shorts element unit tests
 |   `-- parser.test.js        # Unit tests for URL parser, fallbacks & ID resolver
 |-- package.json              # Zero-dependency test, lint & package task definitions
+|-- CHANGELOG.md             # Complete historical record of all releases
+|-- CONTRIBUTING.md          # Open-source contribution guidelines & setup
 |-- CHROMEWEBSTORE.md         # Official Web Store metadata, justifications & privacy policy
 |-- LICENSE                   # Open-source MIT License
 `-- README.md                 # Project documentation & engineering manual
@@ -253,14 +256,25 @@ debait/
 
 ---
 
+## Changelog
+
+Detailed release notes and historical updates for each version are documented in [CHANGELOG.md](CHANGELOG.md).
+
+---
+
 ## Contributing
 
-Contributions, issues, and feature requests are welcome.
+Contributions are welcomed. DeBait is built with a strict zero-dependency architecture and modern Manifest V3 standards.
+
+Please review our [CONTRIBUTING.md](CONTRIBUTING.md) guide before submitting a pull request for information on:
+- Local development and extension loading.
+- Running the zero-dependency test suite (`npm test`).
+- Code style, performance invariants, and conventional commit rules.
 
 1. **Fork the Repository** on GitHub.
 2. **Create a Feature Branch**:
    ```bash
-   git checkout -b feat/custom-timestamp
+   git checkout -b feat/your-feature-name
    ```
 3. **Commit Changes** using [Conventional Commits](https://www.conventionalcommits.org/):
    ```bash
@@ -268,9 +282,9 @@ Contributions, issues, and feature requests are welcome.
    ```
 4. **Push Branch**:
    ```bash
-   git push origin feat/custom-timestamp
+   git push origin feat/your-feature-name
    ```
-5. **Open a Pull Request** describing changes and test verification steps.
+5. **Open a Pull Request** against the `main` branch.
 
 ---
 

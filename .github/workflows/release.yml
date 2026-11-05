@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g. v1.0.1)'
+        description: 'Tag to release (e.g. v1.1.0)'
         required: true
 
 jobs:
@@ -51,16 +51,14 @@ jobs:
 
       - name: Package Extension Distribution ZIP
         run: |
-          ZIP_NAME="debait-${{ steps.version.outputs.tag }}.zip"
-          zip -r "$ZIP_NAME" manifest.json background.js content popup icons README.md LICENSE CHROMEWEBSTORE.md
-          echo "Package created: $ZIP_NAME"
+          npm run package
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "DeBait ${{ steps.version.outputs.tag }}"
           tag_name: ${{ steps.version.outputs.tag }}
-          files: debait-*.zip
+          files: dist/debait-*.zip
           generate_release_notes: true
           draft: false
           prerelease: false
