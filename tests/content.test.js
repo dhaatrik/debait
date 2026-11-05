@@ -61,6 +61,7 @@ function createMockElement(tagName, attributes = {}) {
 
   if (tagName.toUpperCase() === 'IMG') {
     Object.defineProperty(el, 'src', {
+      configurable: true,
       get: () => el.attributes['src'] || '',
       set: (val) => { el.attributes['src'] = val; }
     });
@@ -100,7 +101,7 @@ global.document = {
   createElement: (tag) => createMockElement(tag),
   querySelectorAll: (selector) => {
     if (selector.includes('img[data-debait-orig]')) {
-      return elementsRegistry.filter(el => el.tagName === 'IMG' && el.dataset.debaitOrig);
+      return elementsRegistry.filter(el => el.tagName === 'IMG' && (el.dataset.debaitOrig || el.dataset.debait));
     }
     if (selector.includes('[data-debait-bg-orig]')) {
       return elementsRegistry.filter(el => el.dataset.debaitBgOrig);
@@ -205,5 +206,35 @@ describe('Content Script DOM Replacement & Revert Engine', () => {
     content.restoreImg(img, container);
     assert.equal(img.getAttribute('srcset'), originalSrcset);
     assert.equal(img.dataset.debaitSrcset, undefined);
+  });
+
+  test('restoreImg is idempotent and does not trigger mutation storms on multiple calls', () => {
+    const container = createMockElement('ytd-thumbnail');
+    const img = createMockElement('img');
+    img.src = 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hq720.jpg';
+    container.appendChild(img);
+
+    content.processImg(img);
+    assert.equal(img.dataset.debaitActive, 'true');
+
+    content.restoreImg(img, container);
+    assert.equal(img.dataset.debaitActive, 'false');
+    assert.equal(img.dataset.debaitOrig, undefined);
+
+    let srcWrites = 0;
+    const originalSet = Object.getOwnPropertyDescriptor(img, 'src').set;
+    Object.defineProperty(img, 'src', {
+      get: () => img.attributes['src'] || '',
+      set: (val) => {
+        srcWrites++;
+        originalSet(val);
+      }
+    });
+
+    // Calling restoreImg again must be a strict no-op
+    content.restoreImg(img, container);
+    content.restoreImg(img, container);
+
+    assert.equal(srcWrites, 0, 'Subsequent restoreImg calls must not write to img.src');
   });
 });

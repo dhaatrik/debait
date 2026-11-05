@@ -89,7 +89,7 @@ function isShortsElement(el) {
 
   let settings = { ...DEFAULTS };
   let isScanScheduled = false;
-  const pendingSubtrees = new Set();
+  let isReverting = false;
 
   function parseThumbUrl(url) {
     const m = url && THUMB_RE.exec(url);
@@ -109,10 +109,21 @@ function isShortsElement(el) {
   // ---- High-Performance, Instant Image Swapper (0ms Latency) ----------------
 
   function processImg(img) {
-    if (!isContextValid()) return;
+    if (!isContextValid() || isReverting) return;
+
+    const container = img.closest('ytd-thumbnail, #thumbnail, .ytp-videowall-still') || img.parentElement;
+    const override = container?.dataset?.debaitManualOverride;
+    const shouldShow = override !== undefined ? override === 'true' : settings.enabled;
+
+    if (!shouldShow) {
+      if (img.dataset.debaitActive === 'true' || img.dataset.debaitOrig) {
+        restoreImg(img, container);
+      }
+      return;
+    }
 
     // Shield against infinite mutation cycles: ignore if already managed and active
-    if (img.dataset.debaitActive === 'true' && settings.enabled) return;
+    if (img.dataset.debaitActive === 'true') return;
 
     const src = img.src || img.getAttribute('src') || '';
     const id = parseThumbUrl(src) || resolveIdFromContext(img);
@@ -125,7 +136,6 @@ function isShortsElement(el) {
       }
     }
 
-    const container = img.closest('ytd-thumbnail, #thumbnail, .ytp-videowall-still') || img.parentElement;
     if (container) {
       if (container.dataset.debaitVideoId && container.dataset.debaitVideoId !== id) {
         delete container.dataset.debaitManualOverride;
@@ -139,15 +149,6 @@ function isShortsElement(el) {
       if (img.dataset.debaitActive === 'true') {
         restoreImg(img, container);
       }
-      return;
-    }
-
-    // Check individual override
-    const override = container?.dataset?.debaitManualOverride;
-    const shouldShow = override !== undefined ? override === 'true' : settings.enabled;
-
-    if (!shouldShow) {
-      restoreImg(img, container);
       return;
     }
 
@@ -212,22 +213,31 @@ function isShortsElement(el) {
   }
 
   function restoreImg(img, container) {
+    if (img.dataset.debaitActive === 'false' && !img.dataset.debaitOrig && !img.dataset.debait) {
+      return;
+    }
+
     img.dataset.debaitActive = 'false';
 
     if (img.dataset.debaitOrig) {
-      img.src = img.dataset.debaitOrig;
+      const orig = img.dataset.debaitOrig;
+      delete img.dataset.debaitOrig;
       delete img.dataset.debait;
-    } else {
+      img.src = orig;
+    } else if (img.dataset.debait) {
+      delete img.dataset.debait;
       const id = container?.dataset?.debaitVideoId;
       if (id) {
         img.src = `https://i.ytimg.com/vi/${id}/hq720.jpg`;
-        delete img.dataset.debait;
       }
     }
+
     if (img.dataset.debaitSrcset) {
-      img.setAttribute('srcset', img.dataset.debaitSrcset);
+      const origSrcset = img.dataset.debaitSrcset;
       delete img.dataset.debaitSrcset;
+      img.setAttribute('srcset', origSrcset);
     }
+
     if (container) {
       container.dataset.debaitState = 'original';
       updateBadge(container, false);
@@ -238,6 +248,7 @@ function isShortsElement(el) {
   // ---- Background Image Processing (e.g. Endscreens) -------------------------
 
   function processBg(el) {
+    if (!isContextValid() || isReverting || !settings.enabled) return;
     const style = el.getAttribute('style');
     if (!style || !style.includes('ytimg.com')) return;
     const bg = el.style.backgroundImage;
@@ -250,7 +261,6 @@ function isShortsElement(el) {
     if (!id) return;
 
     el.dataset.debaitBgOrig = bg;
-    if (!settings.enabled) return;
 
     const halfwayUrl = getHalfwayUrl(id, settings.quality);
     el.dataset.debaitBg = halfwayUrl;
@@ -260,6 +270,7 @@ function isShortsElement(el) {
   // ---- Fast Targeted Scanning & Debounced Observation -----------------------
 
   function scanImmediate(root = document) {
+    if (!isContextValid() || isReverting || !settings.enabled) return;
     if (!root || !root.querySelectorAll) return;
 
     if (root.tagName === 'IMG' && (root.closest?.('ytd-thumbnail, #thumbnail') || (root.src && root.src.includes('ytimg.com/vi')))) {
@@ -277,51 +288,34 @@ function isShortsElement(el) {
     }
   }
 
-  function scheduleScan(subtree = null) {
-    if (subtree && subtree !== document) {
-      pendingSubtrees.add(subtree);
-    } else {
-      pendingSubtrees.clear();
-      pendingSubtrees.add(document);
-    }
-
-    if (isScanScheduled) return;
+  function scheduleScan() {
+    if (isScanScheduled || isReverting || !settings.enabled) return;
     isScanScheduled = true;
 
     requestAnimationFrame(() => {
-      if (settings.enabled) {
-        if (pendingSubtrees.has(document)) {
-          scanImmediate(document);
-        } else {
-          for (const root of pendingSubtrees) {
-            if (root && (root === document || root.isConnected)) {
-              scanImmediate(root);
-            }
-          }
-        }
-      }
-      pendingSubtrees.clear();
-      injectNavbarToggle();
       isScanScheduled = false;
+      if (settings.enabled && !isReverting) {
+        scanImmediate(document);
+      }
+      injectNavbarToggle();
     });
   }
 
   const ObserverClass = typeof MutationObserver !== 'undefined' ? MutationObserver : (typeof window !== 'undefined' && window.MutationObserver ? window.MutationObserver : null);
   const observer = ObserverClass ? new ObserverClass((mutations) => {
-    if (!isContextValid()) {
-      observer.disconnect();
+    if (!isContextValid() || isReverting || !settings.enabled) {
+      if (!isContextValid()) observer.disconnect();
       return;
     }
 
     let shouldScan = false;
-    const subtreesToScan = new Set();
 
     for (let i = 0; i < mutations.length; i++) {
       const m = mutations[i];
 
       // Skip DeBait's internal controls and active elements to prevent recursion
       if (m.target) {
-        if (m.target.dataset && m.target.dataset.debaitActive === 'true') {
+        if (m.target.dataset && m.target.dataset.debaitActive === 'true' && m.attributeName !== 'srcset') {
           continue;
         }
         if (isDeBaitNode(m.target)) {
@@ -330,6 +324,8 @@ function isShortsElement(el) {
       }
 
       if (m.type === 'attributes') {
+        if (!settings.enabled) continue;
+
         if (m.attributeName === 'srcset' && m.target.tagName === 'IMG') {
           const img = m.target;
           if (img.dataset.debaitActive === 'true' && img.hasAttribute('srcset')) {
@@ -342,37 +338,29 @@ function isShortsElement(el) {
           processBg(m.target);
         }
       } else if (m.type === 'childList') {
-        let externalNodesAdded = false;
+        if (!settings.enabled) continue;
+
         for (let j = 0; j < m.addedNodes.length; j++) {
           const node = m.addedNodes[j];
-          if (!isDeBaitNode(node)) {
-            externalNodesAdded = true;
-            if (node.nodeType === 1) {
-              subtreesToScan.add(node);
-            }
+          if (node.nodeType === 1 && !isDeBaitNode(node)) {
+            shouldScan = true;
+            break;
           }
-        }
-        if (externalNodesAdded) {
-          shouldScan = true;
         }
       }
     }
 
-    if (shouldScan) {
-      if (subtreesToScan.size > 0) {
-        for (const sub of subtreesToScan) {
-          scheduleScan(sub);
-        }
-      } else {
-        scheduleScan(document);
-      }
+    if (shouldScan && settings.enabled) {
+      scheduleScan();
     }
   }) : null;
 
   // ---- Instant Synchronous Revert (Toggle OFF) -----------------------------
 
   function revertAll() {
-    const modifiedImgs = document.querySelectorAll('img[data-debait-orig]');
+    isReverting = true;
+
+    const modifiedImgs = document.querySelectorAll('img[data-debait-orig], img[data-debait], img[data-debait-active="true"]');
     for (let i = 0; i < modifiedImgs.length; i++) {
       const img = modifiedImgs[i];
       const container = img.closest('ytd-thumbnail, #thumbnail, .ytp-videowall-still') || img.parentElement;
@@ -387,6 +375,14 @@ function isShortsElement(el) {
         delete el.dataset.debaitBg;
         delete el.dataset.debaitBgOrig;
       }
+    }
+
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        isReverting = false;
+      });
+    } else {
+      isReverting = false;
     }
   }
 
@@ -565,13 +561,14 @@ function isShortsElement(el) {
     if (settings.enabled) {
       scanImmediate(document);
     }
+    injectNavbarToggle();
 
     window.addEventListener('yt-navigate-finish', () => {
-      scheduleScan(document);
+      scheduleScan();
     });
 
     window.addEventListener('popstate', () => {
-      scheduleScan(document);
+      scheduleScan();
     });
 
     chrome.storage.onChanged.addListener((changes, areaName) => {
