@@ -125,12 +125,15 @@ ytd-thumbnail yt-img-shadow {
   display: block !important;
 }
 
-yt-img-shadow:not([loaded]) #img {
+/* Constrain Polymer loaded overrides strictly to ytd-thumbnail / #thumbnail */
+ytd-thumbnail yt-img-shadow:not([loaded]) #img,
+#thumbnail yt-img-shadow:not([loaded]) #img {
   display: block !important;
   opacity: 1 !important;
 }
 
-.yt-core-image:not(.yt-core-image--loaded) {
+ytd-thumbnail .yt-core-image:not(.yt-core-image--loaded),
+#thumbnail .yt-core-image:not(.yt-core-image--loaded) {
   opacity: 1 !important;
 }
 
