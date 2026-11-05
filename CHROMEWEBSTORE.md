@@ -81,6 +81,7 @@ DeBait does not collect, transmit, store, or sell any personal or browsing infor
 
 ## Version History
 
+- **v1.1.1** (2026-11-05): Performance patch. Eliminated runaway mutation recursion during toggle off and initial streaming query storms. Made thumbnail restoration strictly idempotent.
 - **v1.1.0** (2026-11-05): Production hardening release. Strictly scoped CSS opacity overrides to thumbnail wrappers. Graceful fallback exhaustion restoring creator original thumbnails. Support for `/live/` and `youtu.be/` links. MutationObserver cascade loop elimination and subtree scanning. Virtualized scroller event delegation preventing stale DOM references. Optional YouTube Shorts mode toggle. Comprehensive Node.js unit test harness and zero-dependency packaging pipeline.
 - **v1.0.6** (2026-11-04): Resolved blank thumbnail loading caused by mutation loop and Polymer opacity overrides.
 - **v1.0.5** (2026-11-04): Guard against extension context invalidation, disable redundant iframe injection, and watch dynamic srcset mutations.

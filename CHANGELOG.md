@@ -5,6 +5,14 @@ All notable changes to the DeBait extension are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-11-05
+
+### Fixed
+- Fixed runaway microtask mutation recursion when toggling DeBait off.
+- Eliminated redundant querySelectorAll calls on micro elements during initial page hydration.
+- Made `restoreImg` strictly idempotent to prevent repeated attribute writes.
+- Added regression test verifying zero redundant writes on consecutive `restoreImg` calls.
+
 ## [1.1.0] - 2026-11-05
 
 ### Added

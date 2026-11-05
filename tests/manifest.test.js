@@ -22,6 +22,11 @@ describe('Manifest V3 Schema & Asset Verification', () => {
     assert.ok(manifest.description && manifest.description.length > 0, 'description is required');
   });
 
+  test('manifest.json version matches package.json version exactly', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+    assert.equal(manifest.version, pkg.version, 'manifest.json and package.json versions must be identical');
+  });
+
   test('declares minimal required permissions', () => {
     assert.deepEqual(manifest.permissions, ['storage']);
     assert.ok(manifest.host_permissions.includes('*://*.youtube.com/*'));
